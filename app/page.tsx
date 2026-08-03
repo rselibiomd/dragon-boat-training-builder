@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import BoatPlanner from "./boat-planner";
 
 type Focus = "Stability" | "Connection" | "Timing" | "Power" | "Speed";
 type LegacyFocus = "Technique" | "Endurance";
@@ -398,6 +399,7 @@ function PaddleMark() {
 }
 
 export default function Home() {
+  const [module, setModule] = useState<"training" | "boats">("training");
   const [focus, setFocus] = useState<Focus>("Stability");
   const [duration, setDuration] = useState(90);
   const [crew, setCrew] = useState<Crew>("Performance");
@@ -482,21 +484,21 @@ export default function Home() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <a className="brand" href="#builder" aria-label="Dragon Boat Training Builder home">
+        <button className="brand brand-button" onClick={() => setModule("training")} type="button" aria-label="Dragon Boat Training Builder home">
           <span className="brand-logo-frame">
-            <img
-              className="brand-logo"
-              src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/kdbc-logo.jpeg`}
-              alt="Kingston Dragon Boat Club"
-            />
+            <img className="brand-logo" src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/kdbc-logo.jpeg`} alt="Kingston Dragon Boat Club" />
           </span>
-          <span className="brand-title">Training Builder</span>
-        </a>
-        <button className="saved-button" onClick={openLibrary} type="button" aria-label="Open saved practices">
-          <span aria-hidden="true">▱</span> Saved practices
+          <span className="brand-title">Coach Tools</span>
         </button>
+        <nav className="module-nav" aria-label="Coach tools">
+          <button className={module === "training" ? "active" : ""} onClick={() => setModule("training")} type="button">Training Builder</button>
+          <button className={module === "boats" ? "active" : ""} onClick={() => setModule("boats")} type="button">Boat Planner</button>
+        </nav>
+        {module === "training" ? <button className="saved-button" onClick={openLibrary} type="button" aria-label="Open saved practices"><span aria-hidden="true">▱</span> Saved practices</button> : <span className="device-badge">⌂ Device-only data</span>}
         <div className="coach-avatar" title="Coach Nico" aria-label="Coach Nico">NS</div>
       </header>
+
+      {module === "boats" ? <BoatPlanner /> : <>
 
       <section className="builder-grid" id="builder">
         <div className="builder-panel">
@@ -629,6 +631,8 @@ export default function Home() {
           </aside>
         </div>
       )}
+
+      </>}
 
       {notice && <div className="toast" role="status">✓ {notice}</div>}
     </main>
