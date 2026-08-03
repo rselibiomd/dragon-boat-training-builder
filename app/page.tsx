@@ -37,6 +37,9 @@ type SavedPlan = {
   notes: string;
 };
 
+type TrainingPrintVariant = "run-sheet" | "detailed";
+type TrainingDisplay = "builder" | "timeline" | "cards" | "compact";
+
 const FOCUSES: Focus[] = ["Stability", "Connection", "Timing", "Power", "Speed"];
 const DURATIONS = [60, 75, 90, 120];
 const CREWS: Crew[] = ["Foundational", "Performance", "Mixed"];
@@ -410,6 +413,11 @@ export default function Home() {
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [notice, setNotice] = useState("");
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printVariant, setPrintVariant] = useState<TrainingPrintVariant | null>(null);
+  const [printTitle, setPrintTitle] = useState("Stability Practice");
+  const [printDate, setPrintDate] = useState(new Date().toISOString().slice(0, 10));
+  const [trainingDisplay, setTrainingDisplay] = useState<TrainingDisplay>("builder");
 
   const session = useMemo(
     () => buildSession(focus, duration, crew, festivalWeeks, emphasis, variation),
@@ -481,8 +489,20 @@ export default function Home() {
     showNotice("Practice copied");
   }
 
+  function openPrintOptions() {
+    setPrintTitle(`${focus} Practice`);
+    setPrintDate(new Date().toISOString().slice(0, 10));
+    setPrintOpen(true);
+  }
+
+  function printTrainingPlan(variant: TrainingPrintVariant) {
+    setPrintVariant(variant);
+    setPrintOpen(false);
+    window.setTimeout(() => window.print(), 80);
+  }
+
   return (
-    <main className="app-shell">
+    <main className={`app-shell training-display-${trainingDisplay}`}>
       <header className="topbar">
         <button className="brand brand-button" onClick={() => setModule("training")} type="button" aria-label="Dragon Boat Training Builder home">
           <span className="brand-logo-frame">
@@ -499,6 +519,20 @@ export default function Home() {
       </header>
 
       {module === "boats" ? <BoatPlanner /> : <>
+
+      <section className="display-switcher-wrap" aria-label="Training console display">
+        <div className="display-switcher-copy"><span>Display</span><strong>Training console</strong></div>
+        <div className="display-switcher" role="group" aria-label="Training console display options">
+          {([
+            ["builder", "Full builder", "Inputs + plan"],
+            ["timeline", "Timeline", "Fast overview"],
+            ["cards", "Coach cards", "Detailed blocks"],
+            ["compact", "Compact", "Tablet / dock"],
+          ] as [TrainingDisplay, string, string][]).map(([value, label, description]) => (
+            <button className={trainingDisplay === value ? "active" : ""} key={value} onClick={() => setTrainingDisplay(value)} type="button"><strong>{label}</strong><small>{description}</small></button>
+          ))}
+        </div>
+      </section>
 
       <section className="builder-grid" id="builder">
         <div className="builder-panel">
@@ -578,7 +612,7 @@ export default function Home() {
           <div className="plan-actions">
             <button onClick={savePlan} type="button">♡ Save</button>
             <button onClick={copyPlan} type="button">▣ Copy</button>
-            <button onClick={() => window.print()} type="button">▤ Print</button>
+            <button onClick={openPrintOptions} type="button">▤ Print</button>
           </div>
         </div>
 
@@ -630,6 +664,56 @@ export default function Home() {
             )}
           </aside>
         </div>
+      )}
+
+
+      {printOpen && (
+        <div className="print-dialog-backdrop" onMouseDown={() => setPrintOpen(false)}>
+          <section className="print-dialog" aria-modal="true" aria-labelledby="training-print-title" role="dialog" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="print-dialog-heading"><div><p className="eyebrow">Print training plan</p><h2 id="training-print-title">Choose your coaching format</h2></div><button aria-label="Close print options" onClick={() => setPrintOpen(false)} type="button">×</button></div>
+            <div className="print-meta-fields">
+              <label><span>Plan title</span><input onChange={(event) => setPrintTitle(event.target.value)} value={printTitle} /></label>
+              <label><span>Practice date</span><input onChange={(event) => setPrintDate(event.target.value)} type="date" value={printDate} /></label>
+            </div>
+            <div className="print-choice-grid">
+              <button onClick={() => printTrainingPlan("run-sheet")} type="button"><span className="print-choice-icon">▤</span><strong>Dockside run sheet</strong><small>One portrait page with the timeline, executable sets, key cues, and note space.</small><b>Print one-page plan →</b></button>
+              <button onClick={() => printTrainingPlan("detailed")} type="button"><span className="print-choice-icon">▥</span><strong>Detailed coaching plan</strong><small>Full purpose, set instructions, coaching cues, and notes across as many pages as needed.</small><b>Print detailed plan →</b></button>
+            </div>
+            <p className="print-dialog-note">Both formats are designed for US Letter paper and remain readable in black and white.</p>
+          </section>
+        </div>
+      )}
+
+      {printVariant && (
+        <section className={`print-document training-print-document training-print-${printVariant}`}>
+          <header className="print-brand-header">
+            <img src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/kdbc-logo.jpeg`} alt="Kingston Dragon Boat Club" />
+            <div><span>Training Plan</span><strong>Coach Tools</strong></div>
+          </header>
+
+          {printVariant === "run-sheet" ? (
+            <article className="training-run-sheet">
+              <div className="print-title-row"><div><p>{crew} crew · {duration} minutes</p><h1>{printTitle || `${focus} Practice`}</h1></div><div><span>Practice date</span><strong>{printDate || "Not set"}</strong></div></div>
+              <div className="print-session-strip"><span><b>Focus</b>{focus}</span><span><b>Emphasis</b>{emphasisLabel(emphasis)}</span><span><b>Festival</b>{festivalWeeks === 0 ? "Race day" : `${festivalWeeks} weeks`}</span><span><b>Total</b>{total} min</span></div>
+              <div className="run-sheet-table">
+                <div className="run-sheet-head"><span>Time</span><span>Block & execution</span><span>Coach cues</span></div>
+                {session.map((block, index) => <div className="run-sheet-row" key={block.id}><span><b>{String(index + 1).padStart(2, "0")}</b><strong>{block.minutes} min</strong></span><span><b>{block.name}</b><small>{block.set}</small></span><span>{block.cues.map((cue) => <i key={cue}>{cue}</i>)}</span></div>)}
+              </div>
+              <div className="print-coach-rule"><b>Coach&apos;s rule</b><span>{focusCopy[focus].cue}. Reset the set when the selected quality is lost.</span></div>
+              <div className="print-notes-box"><b>On-water notes</b><p>{notes || ""}</p><span /><span /><span /></div>
+            </article>
+          ) : (
+            <article className="training-detailed-plan">
+              <div className="print-title-row"><div><p>{crew} crew · {duration} minutes</p><h1>{printTitle || `${focus} Practice`}</h1></div><div><span>Practice date</span><strong>{printDate || "Not set"}</strong></div></div>
+              <div className="print-session-strip"><span><b>Focus</b>{focus}</span><span><b>Emphasis</b>{emphasisLabel(emphasis)}</span><span><b>Festival</b>{festivalWeeks === 0 ? "Race day" : `${festivalWeeks} weeks`}</span><span><b>Total</b>{total} min</span></div>
+              <section className="detailed-print-blocks">
+                {session.map((block, index) => <article className="detailed-print-card" key={block.id}><div className="detailed-print-number">{String(index + 1).padStart(2, "0")}</div><div><header><span>{block.minutes} minutes</span><h2>{block.name}</h2><p>{block.detail}</p></header><div className="detailed-print-grid"><section><b>Purpose</b><p>{block.objective}</p></section><section><b>Set</b><p>{block.set}</p></section></div><div className="detailed-print-cues"><b>Coach cues</b>{block.cues.map((cue) => <span key={cue}>{cue}</span>)}</div></div></article>)}
+              </section>
+              <div className="print-notes-box detailed-notes"><b>Coach&apos;s notes</b><p>{notes || ""}</p><span /><span /><span /></div>
+            </article>
+          )}
+          <footer className="print-page-footer"><span>KDBC Coach Tools</span><span>{printTitle || `${focus} Practice`}</span></footer>
+        </section>
       )}
 
       </>}
