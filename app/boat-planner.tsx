@@ -9,6 +9,8 @@ type Experience = "Developing" | "Experienced" | "Pacer" | "Steer" | "Unknown";
 type RatingKey = "timing" | "connection" | "power" | "stability" | "consistency";
 type Strategy = "balanced" | "strongest";
 type CompositionRule = "count" | "mixed" | "women";
+type BoatPrintVariant = "crew" | "coach";
+type BoatDisplay = "planner" | "seating" | "analysis" | "compact";
 
 type Paddler = {
   id: string;
@@ -490,6 +492,11 @@ export default function BoatPlanner() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState("");
   const [touchDrag, setTouchDrag] = useState<TouchDrag | null>(null);
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printVariant, setPrintVariant] = useState<BoatPrintVariant | null>(null);
+  const [printDate, setPrintDate] = useState(new Date().toISOString().slice(0, 10));
+  const [printNotes, setPrintNotes] = useState("");
+  const [boatDisplay, setBoatDisplay] = useState<BoatDisplay>("planner");
   const touchDragRef = useRef<TouchDrag | null>(null);
 
   useEffect(() => {
@@ -780,13 +787,24 @@ export default function BoatPlanner() {
     showNotice("Lineup copied");
   }
 
+  function openPrintOptions() {
+    setPrintDate(new Date().toISOString().slice(0, 10));
+    setPrintOpen(true);
+  }
+
+  function printBoatPlan(variant: BoatPrintVariant) {
+    setPrintVariant(variant);
+    setPrintOpen(false);
+    window.setTimeout(() => window.print(), 80);
+  }
+
   const assignedPaddlers = [...new Set(boats.flatMap((boat) => boat.seats.flatMap((seat) => [seat.leftId, seat.rightId])).filter(Boolean) as string[])];
   const selectablePaddlers = [...participating].sort((a, b) => a.name.localeCompare(b.name));
   const plannedSeats = Math.min(Math.floor(participating.length / 2) * 2, boatCount * 20);
   const potentialSpares = Math.max(0, participating.length - plannedSeats);
 
   return (
-    <section className="boat-planner-shell">
+    <section className={`boat-planner-shell boat-display-${boatDisplay}`}>
       <div className="boat-hero">
         <div>
           <p className="eyebrow">Boat planning console</p>
@@ -795,6 +813,20 @@ export default function BoatPlanner() {
         </div>
         <div className="privacy-card"><span aria-hidden="true">⌂</span><div><strong>Device-only roster</strong><p>Names, weights, ratings, and saved lineups stay in this browser. Nothing is uploaded to the public site.</p></div></div>
       </div>
+
+      <section className="display-switcher-wrap boat-display-switcher" aria-label="Boat planner display">
+        <div className="display-switcher-copy"><span>Display</span><strong>Boat planner</strong></div>
+        <div className="display-switcher" role="group" aria-label="Boat planner display options">
+          {([
+            ["planner", "Full planner", "Setup + seating"],
+            ["seating", "Seating board", "Drag-and-drop focus"],
+            ["analysis", "Coach analysis", "Profiles + checks"],
+            ["compact", "Compact", "Multi-boat view"],
+          ] as [BoatDisplay, string, string][]).map(([value, label, description]) => (
+            <button className={boatDisplay === value ? "active" : ""} key={value} onClick={() => setBoatDisplay(value)} type="button"><strong>{label}</strong><small>{description}</small></button>
+          ))}
+        </div>
+      </section>
 
       <div className="planner-setup-grid">
         <section className="setup-card roster-setup-card">
@@ -840,7 +872,7 @@ export default function BoatPlanner() {
         <section className="lineup-section" id="boat-lineups">
           <div className="lineup-heading">
             <div><p className="eyebrow">Coach review required</p><h2>{lineupName}</h2><p>Drag paddlers between seats and boats, or drag them back to the roster bench. Lock seats only when you want to protect them from a rebuild.</p></div>
-            <div className="lineup-actions"><button onClick={generate} type="button">↻ Rebuild unlocked</button><button onClick={clearSeatsForManualPlanning} type="button">Start manual</button><button onClick={saveLineup} type="button">♡ Save</button><button onClick={copyLineup} type="button">▣ Copy</button><button onClick={() => window.print()} type="button">▤ Print</button><button onClick={() => setSavedOpen(true)} type="button">Saved lineups</button></div>
+            <div className="lineup-actions"><button onClick={generate} type="button">↻ Rebuild unlocked</button><button onClick={clearSeatsForManualPlanning} type="button">Start manual</button><button onClick={saveLineup} type="button">♡ Save</button><button onClick={copyLineup} type="button">▣ Copy</button><button onClick={openPrintOptions} type="button">▤ Print</button><button onClick={() => setSavedOpen(true)} type="button">Saved lineups</button></div>
           </div>
 
           <div
@@ -975,6 +1007,68 @@ export default function BoatPlanner() {
 
       {savedOpen && (
         <div className="drawer-backdrop" onMouseDown={() => setSavedOpen(false)}><aside className="library-drawer" onMouseDown={(event) => event.stopPropagation()}><div className="drawer-heading"><div><p className="eyebrow">This device</p><h2>Saved lineups</h2></div><button aria-label="Close saved lineups" onClick={() => setSavedOpen(false)} type="button">×</button></div>{savedLineups.length ? <div className="saved-list">{savedLineups.map((saved) => <button key={saved.id} onClick={() => loadLineup(saved)} type="button"><span><strong>{saved.name}</strong><small>{saved.boats.length} boat{saved.boats.length === 1 ? "" : "s"} · {saved.savedAt}</small></span><b>Load →</b></button>)}</div> : <div className="empty-state"><span>▱</span><h3>No saved lineups yet</h3><p>Save a generated lineup and it will appear here.</p></div>}</aside></div>
+      )}
+
+      {printOpen && (
+        <div className="print-dialog-backdrop" onMouseDown={() => setPrintOpen(false)}>
+          <section className="print-dialog boat-print-dialog" aria-modal="true" aria-labelledby="boat-print-title" role="dialog" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="print-dialog-heading"><div><p className="eyebrow">Print boat plan</p><h2 id="boat-print-title">Choose who will use this lineup</h2></div><button aria-label="Close print options" onClick={() => setPrintOpen(false)} type="button">×</button></div>
+            <div className="print-meta-fields">
+              <label><span>Lineup date</span><input onChange={(event) => setPrintDate(event.target.value)} type="date" value={printDate} /></label>
+              <label className="print-notes-field"><span>Print notes (optional)</span><input onChange={(event) => setPrintNotes(event.target.value)} placeholder="Race, crew call, lane, conditions…" value={printNotes} /></label>
+            </div>
+            <div className="print-choice-grid">
+              <button onClick={() => printBoatPlan("crew")} type="button"><span className="print-choice-icon">♙</span><strong>Crew-safe boat card</strong><small>Names, rows, left/right positions, spares, and your print note. No private ratings or weights.</small><b>Print crew version →</b></button>
+              <button onClick={() => printBoatPlan("coach")} type="button"><span className="print-choice-icon">◎</span><strong>Coach-detail boat card</strong><small>Adds weight, side preference, rating summary, section profile, and lineup warnings.</small><b>Print coach version →</b></button>
+            </div>
+            <p className="print-dialog-note">Each boat prints on its own landscape Letter page using a top-down dragon boat layout.</p>
+          </section>
+        </div>
+      )}
+
+      {printVariant && (
+        <section className={`print-document boat-print-document boat-print-${printVariant}`}>
+          {boats.map((boat, boatIndex) => {
+            const ids = boat.seats.flatMap((seat) => [seat.leftId, seat.rightId]).filter(Boolean) as string[];
+            const members = ids.map((id) => paddlerMap.get(id)).filter(Boolean) as Paddler[];
+            const profile = profileForBoat(boat, paddlerMap);
+            const average = members.length ? members.reduce((sum, paddler) => sum + composite(paddler), 0) / members.length : 0;
+            return <article className="print-boat-sheet" key={boat.id}>
+              <header className="print-brand-header">
+                <img src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/kdbc-logo.jpeg`} alt="Kingston Dragon Boat Club" />
+                <div><span>{printVariant === "coach" ? "Coach-detail lineup" : "Crew boat card"}</span><strong>Boat {boatIndex + 1} of {boats.length}</strong></div>
+              </header>
+              <div className="boat-print-title"><div><p>{strategy === "balanced" ? "Balanced boats" : "Strongest-first"} · {members.length} paddlers</p><h1>{lineupName} · {boat.name}</h1></div><div><span>Lineup date</span><strong>{printDate || "Not set"}</strong></div></div>
+              {printNotes && <div className="boat-print-note"><b>Coach note</b><span>{printNotes}</span></div>}
+
+              <div className="dragon-boat-diagram" aria-label={`${boat.name} top-down seating plan`}>
+                <div className="dragon-prow" aria-hidden="true"><span>◆</span><b>Bow</b></div>
+                <div className="dragon-hull">
+                  <span className="hull-side-label hull-left-label">Left side</span>
+                  <span className="hull-side-label hull-right-label">Right side</span>
+                  {boat.seats.map((seat) => {
+                    const left = seat.leftId ? paddlerMap.get(seat.leftId) : undefined;
+                    const right = seat.rightId ? paddlerMap.get(seat.rightId) : undefined;
+                    return <div className={`print-boat-row ${seat.active ? "active" : "inactive"}`} key={seat.row}>
+                      <div className="print-seat print-seat-left"><strong>{left?.name || "Vacant"}</strong>{printVariant === "coach" && left && <small>{left.weightKg ? `${left.weightKg} kg` : "Wt ?"} · {left.sideExclusive ? `${left.sidePref} only` : `Pref ${left.sidePref}`} · {composite(left).toFixed(1)}</small>}</div>
+                      <span className="print-row-number"><b>{seat.row}</b><small>{zoneForRow(seat.row)}</small></span>
+                      <div className="print-seat print-seat-right"><strong>{right?.name || "Vacant"}</strong>{printVariant === "coach" && right && <small>{right.weightKg ? `${right.weightKg} kg` : "Wt ?"} · {right.sideExclusive ? `${right.sidePref} only` : `Pref ${right.sidePref}`} · {composite(right).toFixed(1)}</small>}</div>
+                    </div>;
+                  })}
+                </div>
+                <div className="dragon-stern" aria-hidden="true"><b>Stern</b><span /></div>
+              </div>
+
+              {printVariant === "coach" && <div className="coach-print-summary"><div><span>Crew score</span><strong>{average.toFixed(1)}</strong></div><div><span>Front</span><strong>{formatProfile(profile.front)}</strong><small>Timing · connection · consistency</small></div><div><span>Middle</span><strong>{formatProfile(profile.middle)}</strong><small>Power · connection · consistency</small></div><div><span>Back</span><strong>{formatProfile(profile.back)}</strong><small>Stability · timing · consistency</small></div><div><span>Ratings known</span><strong>{profile.coverage}%</strong></div></div>}
+
+              <div className="boat-print-footer-grid">
+                <section><b>Spares / roster bench</b><p>{spares.length ? spares.map((paddler) => paddler.name).join(" · ") : "No spares listed"}</p></section>
+                {printVariant === "coach" ? <section className={boat.warnings.length ? "warning" : ""}><b>{boat.warnings.length ? "Coach checks" : "Lineup checks"}</b><p>{boat.warnings.length ? boat.warnings.join(" ") : "No major flags. Confirm trim once the crew is aboard."}</p></section> : <section><b>Crew reminder</b><p>Confirm your side and row before loading. Follow the coach or steer&apos;s final direction at the dock.</p></section>}
+              </div>
+              <footer className="print-page-footer"><span>KDBC Coach Tools</span><span>{lineupName} · {boat.name}</span></footer>
+            </article>;
+          })}
+        </section>
       )}
 
       {notice && <div className="toast" role="status">✓ {notice}</div>}
