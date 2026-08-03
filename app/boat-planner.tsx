@@ -625,17 +625,30 @@ export default function BoatPlanner() {
     const displacedId = targetSeat[currentKey];
     if (displacedId === paddlerId) return;
 
-    let source: { seat: Seat; key: "leftId" | "rightId" } | null = null;
-    next.forEach((boat) => boat.seats.forEach((seat) => {
-      if (seat.leftId === paddlerId) source = { seat, key: "leftId" };
-      if (seat.rightId === paddlerId) source = { seat, key: "rightId" };
-    }));
+    let sourceBoatIndex = -1;
+    let sourceRowIndex = -1;
+    let sourceKey: "leftId" | "rightId" | null = null;
+    for (let bIndex = 0; bIndex < next.length; bIndex += 1) {
+      for (let sIndex = 0; sIndex < next[bIndex].seats.length; sIndex += 1) {
+        const sourceSeat = next[bIndex].seats[sIndex];
+        if (sourceSeat.leftId === paddlerId) {
+          sourceBoatIndex = bIndex;
+          sourceRowIndex = sIndex;
+          sourceKey = "leftId";
+        } else if (sourceSeat.rightId === paddlerId) {
+          sourceBoatIndex = bIndex;
+          sourceRowIndex = sIndex;
+          sourceKey = "rightId";
+        }
+      }
+    }
 
-    if (source) source.seat[source.key] = displacedId;
+    const sourceFound = sourceKey !== null && sourceBoatIndex >= 0 && sourceRowIndex >= 0;
+    if (sourceFound && sourceKey) next[sourceBoatIndex].seats[sourceRowIndex][sourceKey] = displacedId;
     targetSeat[currentKey] = paddlerId;
     finishBoatEdit(next);
     setError("");
-    if (!source && displacedId) showNotice(`${paddler.name} moved into the boat; ${paddlerMap.get(displacedId)?.name ?? "previous paddler"} moved to the bench`);
+    if (!sourceFound && displacedId) showNotice(`${paddler.name} moved into the boat; ${paddlerMap.get(displacedId)?.name ?? "previous paddler"} moved to the bench`);
   }
 
   function movePaddlerToBench(paddlerId: string) {
