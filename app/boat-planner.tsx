@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, DragEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import type { ConsoleTheme } from "./page";
 
 type Side = "L" | "R" | "Either";
 type Position = "Front" | "Middle" | "Back" | "Any";
@@ -59,6 +60,11 @@ type TouchDrag = {
   pointerId: number;
   x: number;
   y: number;
+};
+
+type BoatPlannerProps = {
+  theme: ConsoleTheme;
+  onThemeChange: (theme: ConsoleTheme) => void;
 };
 
 const RATING_KEYS: RatingKey[] = ["timing", "connection", "power", "stability", "consistency"];
@@ -473,7 +479,7 @@ function downloadText(filename: string, contents: string) {
 
 const CSV_HEADERS = ["name", "participating", "side_pref", "side_exclusive", "weight_kg", "preferred_position", "gender", "experience", "timing", "connection", "power", "stability", "consistency", "notes"];
 
-export default function BoatPlanner() {
+export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) {
   const [paddlers, setPaddlers] = useState<Paddler[]>([]);
   const [boatCount, setBoatCount] = useState(1);
   const [strategy, setStrategy] = useState<Strategy>("balanced");
@@ -826,6 +832,18 @@ export default function BoatPlanner() {
             <button className={boatDisplay === value ? "active" : ""} key={value} onClick={() => setBoatDisplay(value)} type="button"><strong>{label}</strong><small>{description}</small></button>
           ))}
         </div>
+        <div className="theme-picker" role="group" aria-label="Console colour theme">
+          {([
+            ["dark", "Dark", "Performance navy"],
+            ["light", "Light", "Club white"],
+            ["neo", "Neo", "Modern minimal"],
+          ] as [ConsoleTheme, string, string][]).map(([value, label, description]) => (
+            <button aria-pressed={theme === value} className={theme === value ? "active" : ""} key={value} onClick={() => onThemeChange(value)} title={description} type="button">
+              <i className={`theme-swatch theme-swatch-${value}`} aria-hidden="true" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
       </section>
 
       <div className="planner-setup-grid">
@@ -917,7 +935,10 @@ export default function BoatPlanner() {
                     <div><span>Middle</span><strong>{formatProfile(profile.middle)}</strong><small>Power · connection · consistency</small></div>
                     <div><span>Back</span><strong>{formatProfile(profile.back)}</strong><small>Stability · timing · consistency</small></div>
                   </div>
-                  <div className="seat-head"><span>Left</span><b>Bow</b><span>Right</span></div>
+                  <div className="interactive-boat-shell">
+                    <div className="interactive-bow" aria-hidden="true"><span /><b>Bow</b></div>
+                    <div className="interactive-hull">
+                  <div className="seat-head"><span>Left</span><b>Seat pair</b><span>Right</span></div>
                   <div className="seat-plan">
                     {boat.seats.map((seat, rowIndex) => seat.active ? (
                       <div className="seat-row" key={seat.row}>
@@ -961,7 +982,9 @@ export default function BoatPlanner() {
                       </div>
                     ) : <div className="empty-row" key={seat.row}><span /> <b>{seat.row}</b> <span /></div>)}
                   </div>
-                  <div className="stern-label">Stern</div>
+                  <div className="stern-label"><span />Stern</div>
+                    </div>
+                  </div>
                   <div className={`boat-checks ${boat.warnings.length ? "has-warnings" : ""}`}><strong>{boat.warnings.length ? `${boat.warnings.length} check${boat.warnings.length === 1 ? "" : "s"}` : "No major flags"}</strong>{boat.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div>
                 </article>
               );
