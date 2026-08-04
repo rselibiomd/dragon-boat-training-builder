@@ -130,6 +130,79 @@ input[type="range"] {
   color: #607789;
 }
 
+.theme-picker {
+  background: #edf3f7;
+  border: 1px solid #dce5eb;
+  border-radius: 10px;
+  display: grid;
+  flex: 0 0 auto;
+  gap: 3px;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 4px;
+  width: 234px;
+}
+
+.theme-picker button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: #607789;
+  display: flex;
+  font-size: 9px;
+  font-weight: 780;
+  gap: 6px;
+  justify-content: center;
+  min-height: 46px;
+  padding: 6px 7px;
+}
+
+.theme-picker button.active {
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(8, 35, 55, 0.1);
+  color: var(--navy-950);
+}
+
+.theme-swatch {
+  border: 1px solid rgba(10, 32, 54, 0.18);
+  border-radius: 50%;
+  display: block;
+  height: 13px;
+  position: relative;
+  width: 13px;
+}
+
+.theme-swatch::after {
+  border-radius: 50%;
+  content: "";
+  height: 4px;
+  position: absolute;
+  right: 1px;
+  top: 1px;
+  width: 4px;
+}
+
+.theme-swatch-dark {
+  background: #071c2d;
+}
+
+.theme-swatch-dark::after,
+.theme-swatch-light::after {
+  background: #ff484f;
+}
+
+.theme-swatch-light {
+  background: #fff;
+}
+
+.theme-swatch-neo {
+  background: #f5f5f2;
+}
+
+.theme-swatch-neo::after {
+  background: #285cff;
+}
+
 .training-display-timeline .full-plan,
 .training-display-cards .builder-grid {
   display: none;
@@ -1157,6 +1230,7 @@ input[type="range"] {
 }
 
 .boat-display-analysis .roster-bench,
+.boat-display-analysis .interactive-boat-shell,
 .boat-display-analysis .seat-head,
 .boat-display-analysis .seat-plan,
 .boat-display-analysis .stern-label {
@@ -1811,6 +1885,76 @@ input[type="range"] {
   font-size: 7px;
 }
 
+.interactive-boat-shell {
+  background:
+    radial-gradient(ellipse at 50% 3%, rgba(83, 159, 202, 0.12), transparent 38%),
+    linear-gradient(180deg, rgba(236, 246, 251, 0.78), rgba(255, 255, 255, 0));
+  padding: 13px 12px 17px;
+  position: relative;
+}
+
+.interactive-bow {
+  align-items: center;
+  background: var(--coral);
+  clip-path: polygon(50% 0, 83% 28%, 100% 100%, 0 100%, 17% 28%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  height: 40px;
+  justify-content: center;
+  margin: 0 auto -3px;
+  position: relative;
+  width: 72px;
+  z-index: 2;
+}
+
+.interactive-bow span {
+  background: #fff;
+  border: 2px solid var(--navy-950);
+  border-radius: 50%;
+  height: 9px;
+  position: absolute;
+  top: 9px;
+  width: 9px;
+}
+
+.interactive-bow b {
+  font-size: 7px;
+  letter-spacing: 0.1em;
+  margin-top: 14px;
+  text-transform: uppercase;
+}
+
+.interactive-hull {
+  background: rgba(255, 255, 255, 0.94);
+  border: 3px solid var(--navy-800);
+  border-radius: 38% 38% 18% 18% / 3.2% 3.2% 2.2% 2.2%;
+  box-shadow: inset 0 0 0 2px rgba(255, 72, 79, 0.35), 0 10px 24px rgba(8, 35, 55, 0.08);
+  margin: 0 auto;
+  max-width: 470px;
+  padding: 12px 8px 10px;
+  position: relative;
+}
+
+.interactive-hull::before,
+.interactive-hull::after {
+  background: linear-gradient(90deg, transparent, var(--coral), transparent);
+  content: "";
+  height: 2px;
+  left: 22%;
+  opacity: 0.55;
+  position: absolute;
+  right: 22%;
+}
+
+.interactive-hull::before {
+  top: 8px;
+}
+
+.interactive-hull::after {
+  bottom: 8px;
+}
+
 .seat-plan {
   padding: 0 12px;
 }
@@ -1972,13 +2116,267 @@ input[type="range"] {
 }
 
 .stern-label {
+  align-items: center;
   color: var(--coral-dark);
+  display: flex;
+  flex-direction: column;
   font-size: 7px;
   font-weight: 800;
   letter-spacing: 0.1em;
   padding: 6px 0 10px;
   text-align: center;
   text-transform: uppercase;
+}
+
+.stern-label span {
+  background: var(--navy-800);
+  border-radius: 0 0 60% 60%;
+  display: block;
+  height: 22px;
+  margin: 0 auto 4px;
+  width: 9px;
+}
+
+@media screen {
+  .app-shell.theme-light {
+    background:
+      radial-gradient(circle at 22% 8%, rgba(49, 112, 153, 0.07), transparent 29rem),
+      #f5f8fa;
+  }
+
+  .app-shell.theme-dark {
+    --navy-950: #020b12;
+    --navy-900: #071a28;
+    --navy-800: #12344b;
+    --navy-700: #6f9bb6;
+    --ink: #eef5f9;
+    --muted: #91a8b9;
+    --line: #294255;
+    --soft-line: #20384a;
+    --surface: #0b2234;
+    --canvas: #051522;
+    --coral: #ff565d;
+    --coral-dark: #ff6c72;
+    --blue-soft: #0d2b42;
+    background:
+      radial-gradient(circle at 18% 5%, rgba(57, 133, 175, 0.2), transparent 31rem),
+      #051522;
+    color: var(--ink);
+    color-scheme: dark;
+  }
+
+  .theme-dark :where(.display-switcher-wrap, .control-card, .festival-card, .summary-card, .full-plan, .emphasis-panel, .detail-card, .setup-card, .spares-card, .boat-card, .print-dialog, .library-drawer, .roster-drawer, .edit-drawer) {
+    background: #0b2234;
+  }
+
+  .theme-dark :where(.display-switcher, .theme-picker, .roster-stat-row > div, .boat-count-row button, .strategy-toggle, .ratings-editor, .saved-list button, .roster-list article, .bench-paddlers button, .print-choice-grid > button) {
+    background: #0f2b40;
+    border-color: #2c475a;
+  }
+
+  .theme-dark :where(.chip-row button, .seat-cell) {
+    background: #16364e;
+    border-color: #365267;
+    color: #f3f8fb;
+  }
+
+  .theme-dark .display-switcher-copy strong,
+  .theme-dark .display-switcher button,
+  .theme-dark .theme-picker button {
+    color: #a9bdca;
+  }
+
+  .theme-dark .display-switcher button small {
+    color: #7892a4;
+  }
+
+  .theme-dark .display-switcher button.active,
+  .theme-dark .theme-picker button.active {
+    background: #16364e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+    color: #f7fbfd;
+  }
+
+  .theme-dark .display-switcher button.active small {
+    color: #a9bdca;
+  }
+
+  .theme-dark .roster-stat-row > div,
+  .theme-dark .boat-count-row button,
+  .theme-dark .strategy-toggle button,
+  .theme-dark .setup-actions button:not(:first-child),
+  .theme-dark .lineup-actions button:not(:first-child),
+  .theme-dark .roster-bulk-actions button,
+  .theme-dark .roster-list article > button,
+  .theme-dark .bench-paddlers button,
+  .theme-dark .print-choice-grid > button {
+    background: #102c42;
+    border-color: #355267;
+    color: #eef5f9;
+  }
+
+  .theme-dark .boat-count-row button.active,
+  .theme-dark .strategy-toggle button.active {
+    background: #183e59;
+    border-color: #6797b4;
+    box-shadow: inset 0 0 0 1px #6797b4;
+    color: #fff;
+  }
+
+  .theme-dark .roster-stat-row strong,
+  .theme-dark .boat-count-row button strong,
+  .theme-dark .strategy-toggle button strong {
+    color: #f4f8fb;
+  }
+
+  .theme-dark .roster-stat-row small,
+  .theme-dark .boat-count-row button small,
+  .theme-dark .strategy-toggle button small {
+    color: #91a8b9;
+  }
+
+  .theme-dark .planner-field > span,
+  .theme-dark .edit-form label > span {
+    color: #9fb4c2;
+  }
+
+  .theme-dark .festival-note {
+    background: linear-gradient(135deg, #0d2a40, #0b2234);
+    border-color: #31536a;
+  }
+
+  .theme-dark :where(.emphasis-panel, .boat-profile) {
+    background: #0d273b;
+    border-color: #294255;
+  }
+
+  .theme-dark .planner-field input,
+  .theme-dark .planner-field select,
+  .theme-dark .roster-tools input,
+  .theme-dark .edit-form input,
+  .theme-dark .edit-form select,
+  .theme-dark .edit-form textarea,
+  .theme-dark .print-meta-fields input,
+  .theme-dark .seat-cell select {
+    background: #0d283d;
+    border-color: #365267;
+    color: #eef5f9;
+  }
+
+  .theme-dark .planner-field select,
+  .theme-dark .edit-form select,
+  .theme-dark .seat-cell select {
+    color-scheme: dark;
+  }
+
+  .theme-dark :where(.boat-metrics b, .boat-profile strong, .seat-cell select, .spares-card p) {
+    color: #eef5f9;
+  }
+
+  .theme-dark .interactive-boat-shell {
+    background: radial-gradient(ellipse at 50% 3%, rgba(57, 145, 194, 0.18), transparent 42%);
+  }
+
+  .theme-dark .interactive-hull {
+    background: #081d2c;
+    border-color: #456b82;
+    box-shadow: inset 0 0 0 2px rgba(255, 86, 93, 0.42), 0 14px 30px rgba(0, 0, 0, 0.24);
+  }
+
+  .theme-dark :where(.logic-card, .planner-truth) {
+    background: #102c42;
+    border-color: #35546a;
+  }
+
+  .theme-dark :where(.logic-card p, .planner-truth p) {
+    color: #a8bdca;
+  }
+
+  .app-shell.theme-neo {
+    --navy-950: #111214;
+    --navy-900: #191a1d;
+    --navy-800: #303237;
+    --navy-700: #4e5259;
+    --ink: #17181a;
+    --muted: #6d7076;
+    --line: #d8dade;
+    --soft-line: #e8eaed;
+    --surface: #fff;
+    --canvas: #f4f4f1;
+    --coral: #285cff;
+    --coral-dark: #1747db;
+    --blue-soft: #eef2ff;
+    background: #f4f4f1;
+    color: var(--ink);
+  }
+
+  .theme-neo .topbar {
+    background: rgba(250, 250, 247, 0.96);
+    border-bottom: 1px solid #d5d6d4;
+    color: #17181a;
+  }
+
+  .theme-neo .topbar::after {
+    display: none;
+  }
+
+  .theme-neo .module-nav {
+    background: #ecece8;
+    border-color: #d7d8d6;
+  }
+
+  .theme-neo .module-nav button {
+    color: #6a6d72;
+  }
+
+  .theme-neo .module-nav button.active {
+    background: #17181a;
+    color: #fff;
+  }
+
+  .theme-neo :where(.saved-button, .device-badge) {
+    color: #4e5259;
+  }
+
+  .theme-neo .coach-avatar {
+    background: #285cff;
+    border-color: #17181a;
+    color: #fff;
+  }
+
+  .theme-neo :where(.control-card, .festival-card, .summary-card, .emphasis-panel, .detail-card, .setup-card, .privacy-card, .planner-build-row, .spares-card, .boat-card, .notes-card, .logic-card, .planner-truth, .print-dialog, .library-drawer, .roster-drawer, .edit-drawer) {
+    border-radius: 4px;
+    box-shadow: none;
+  }
+
+  .theme-neo :where(.build-button, .planner-build-row > button, .setup-actions button:first-child, .file-button.primary) {
+    background: #285cff;
+    border-color: #285cff;
+    box-shadow: none;
+  }
+
+  .theme-neo :where(.privacy-card, .planner-build-row, .notes-card, .boat-card > header) {
+    background: #17181a;
+  }
+
+  .theme-neo .festival-note {
+    background: #f1f3ff;
+    border-color: #cbd5ff;
+  }
+
+  .theme-neo .interactive-boat-shell {
+    background: #f0f0ec;
+  }
+
+  .theme-neo .interactive-hull {
+    border-color: #17181a;
+    border-radius: 34% 34% 12% 12% / 3% 3% 2% 2%;
+    box-shadow: inset 0 0 0 2px rgba(40, 92, 255, 0.4);
+  }
+
+  .theme-neo .interactive-bow {
+    background: #285cff;
+  }
 }
 
 .boat-checks {
@@ -2552,6 +2950,15 @@ input[type="range"] {
 
   .display-switcher button {
     flex: 0 0 124px;
+  }
+
+  .theme-picker {
+    align-self: flex-start;
+    width: min(100%, 270px);
+  }
+
+  .theme-picker button {
+    min-height: 39px;
   }
 
   .topbar {
@@ -3450,69 +3857,75 @@ input[type="range"] {
   .dragon-boat-diagram {
     align-items: stretch;
     display: grid;
-    grid-template-columns: 0.78in minmax(0, 1fr) 0.48in;
-    height: 3.55in;
-    margin-top: 0.13in;
+    grid-template-rows: 0.43in minmax(0, 1fr) 0.26in;
+    height: 4.15in;
+    margin: 0.1in auto 0;
     position: relative;
+    width: 4.75in;
   }
 
   .dragon-prow {
     align-items: center;
+    align-self: end;
     background: #e23a43;
-    border-radius: 58% 15% 18% 58%;
+    clip-path: polygon(50% 0, 82% 30%, 100% 100%, 0 100%, 18% 30%);
     color: #fff;
     display: flex;
     flex-direction: column;
+    height: 0.48in;
     justify-content: center;
-    margin: 0.42in -0.04in 0.42in 0;
+    justify-self: center;
+    margin-bottom: -0.04in;
     position: relative;
+    width: 0.92in;
     z-index: 2;
   }
 
   .dragon-prow::before {
     background: #fff;
-    border: 2px solid #071d31;
+    border: 1.5px solid #071d31;
     border-radius: 50%;
-    box-shadow: -0.23in -0.17in 0 -0.07in #e23a43, -0.23in 0.17in 0 -0.07in #e23a43;
     content: "";
-    height: 0.11in;
-    left: 0.09in;
+    height: 0.08in;
     position: absolute;
-    top: 0.24in;
-    width: 0.11in;
+    top: 0.09in;
+    width: 0.08in;
   }
 
   .dragon-prow::after {
-    border-bottom: 0.08in solid transparent;
-    border-right: 0.21in solid #e23a43;
-    border-top: 0.08in solid transparent;
+    background: #071d31;
+    border-radius: 50%;
     content: "";
-    left: -0.14in;
+    height: 0.025in;
     position: absolute;
-    top: 0.18in;
-    transform: rotate(-34deg);
+    top: 0.12in;
+    width: 0.025in;
   }
 
   .dragon-prow span {
-    font-size: 11pt;
+    display: none;
   }
 
   .dragon-prow b,
   .dragon-stern b {
-    font-size: 6pt;
-    letter-spacing: 0.08em;
+    font-size: 5.5pt;
+    letter-spacing: 0.09em;
     text-transform: uppercase;
+  }
+
+  .dragon-prow b {
+    margin-top: 0.18in;
   }
 
   .dragon-hull {
     background: #fff;
-    border: 0.09in solid #0a2740;
-    border-radius: 18% 9% 9% 18% / 28% 17% 17% 28%;
-    box-shadow: inset 0 0 0 0.035in #e23a43;
+    border: 0.065in solid #0a2740;
+    border-radius: 38% 38% 16% 16% / 4% 4% 2.5% 2.5%;
+    box-shadow: inset 0 0 0 0.025in #e23a43;
     display: grid;
-    gap: 0.025in;
-    grid-template-columns: repeat(10, minmax(0, 1fr));
-    padding: 0.29in 0.14in;
+    gap: 0.018in;
+    grid-template-rows: repeat(10, minmax(0, 1fr));
+    padding: 0.25in 0.25in 0.18in;
     position: relative;
   }
 
@@ -3521,24 +3934,23 @@ input[type="range"] {
     font-size: 5.8pt;
     font-weight: 700;
     letter-spacing: 0.1em;
-    left: 50%;
     position: absolute;
     text-transform: uppercase;
-    transform: translateX(-50%);
+    top: 0.07in;
   }
 
   .hull-left-label {
-    top: 0.075in;
+    left: 0.42in;
   }
 
   .hull-right-label {
-    bottom: 0.07in;
+    right: 0.42in;
   }
 
   .print-boat-row {
     display: grid;
     gap: 0.04in;
-    grid-template-rows: minmax(0, 1fr) 0.34in minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 0.36in minmax(0, 1fr);
     min-width: 0;
   }
 
@@ -3554,16 +3966,16 @@ input[type="range"] {
     flex-direction: column;
     justify-content: center;
     min-width: 0;
-    padding: 0.04in 0.025in;
+    padding: 0.025in 0.045in;
     text-align: center;
   }
 
   .print-seat-left {
-    border-radius: 0.12in 0.12in 0 0;
+    border-radius: 0.1in 0 0 0.1in;
   }
 
   .print-seat-right {
-    border-radius: 0 0 0.12in 0.12in;
+    border-radius: 0 0.1in 0.1in 0;
   }
 
   .print-seat strong {
@@ -3616,10 +4028,11 @@ input[type="range"] {
 
   .dragon-stern span {
     background: #0a2740;
-    border-radius: 0 60% 60% 0;
-    height: 1.7in;
-    margin-left: -0.02in;
-    width: 0.28in;
+    border-radius: 0 0 60% 60%;
+    height: 0.22in;
+    margin-top: -0.02in;
+    order: -1;
+    width: 0.13in;
   }
 
   .coach-print-summary {
