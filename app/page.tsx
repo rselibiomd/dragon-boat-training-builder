@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import BoatPlanner from "./boat-planner";
 
 type Focus = "Stability" | "Connection" | "Timing" | "Power" | "Speed";
@@ -39,6 +39,7 @@ type SavedPlan = {
 
 type TrainingPrintVariant = "run-sheet" | "detailed";
 type TrainingDisplay = "builder" | "timeline" | "cards" | "compact";
+export type ConsoleTheme = "dark" | "light" | "neo";
 
 const FOCUSES: Focus[] = ["Stability", "Connection", "Timing", "Power", "Speed"];
 const DURATIONS = [60, 75, 90, 120];
@@ -401,6 +402,23 @@ function PaddleMark() {
   return <span className="paddle-mark" aria-hidden="true"><span /></span>;
 }
 
+function ThemePicker({ theme, onChange }: { theme: ConsoleTheme; onChange: (theme: ConsoleTheme) => void }) {
+  return (
+    <div className="theme-picker" role="group" aria-label="Console colour theme">
+      {([
+        ["dark", "Dark", "Performance navy"],
+        ["light", "Light", "Club white"],
+        ["neo", "Neo", "Modern minimal"],
+      ] as [ConsoleTheme, string, string][]).map(([value, label, description]) => (
+        <button aria-pressed={theme === value} className={theme === value ? "active" : ""} key={value} onClick={() => onChange(value)} title={description} type="button">
+          <i className={`theme-swatch theme-swatch-${value}`} aria-hidden="true" />
+          <span>{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   const [module, setModule] = useState<"training" | "boats">("training");
   const [focus, setFocus] = useState<Focus>("Stability");
@@ -418,6 +436,14 @@ export default function Home() {
   const [printTitle, setPrintTitle] = useState("Stability Practice");
   const [printDate, setPrintDate] = useState(new Date().toISOString().slice(0, 10));
   const [trainingDisplay, setTrainingDisplay] = useState<TrainingDisplay>("builder");
+  const [theme, setTheme] = useState<ConsoleTheme>("light");
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem("kdbc-console-theme");
+    if (savedTheme !== "dark" && savedTheme !== "light" && savedTheme !== "neo") return;
+    const frame = window.requestAnimationFrame(() => setTheme(savedTheme));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   const session = useMemo(
     () => buildSession(focus, duration, crew, festivalWeeks, emphasis, variation),
@@ -501,8 +527,13 @@ export default function Home() {
     window.setTimeout(() => window.print(), 80);
   }
 
+  function changeTheme(nextTheme: ConsoleTheme) {
+    setTheme(nextTheme);
+    window.localStorage.setItem("kdbc-console-theme", nextTheme);
+  }
+
   return (
-    <main className={`app-shell training-display-${trainingDisplay}`}>
+    <main className={`app-shell theme-${theme} training-display-${trainingDisplay}`}>
       <header className="topbar">
         <button className="brand brand-button" onClick={() => setModule("training")} type="button" aria-label="Dragon Boat Training Builder home">
           <span className="brand-logo-frame">
@@ -518,7 +549,7 @@ export default function Home() {
         <div className="coach-avatar" title="Coach Nico" aria-label="Coach Nico">NS</div>
       </header>
 
-      {module === "boats" ? <BoatPlanner /> : <>
+      {module === "boats" ? <BoatPlanner onThemeChange={changeTheme} theme={theme} /> : <>
 
       <section className="display-switcher-wrap" aria-label="Training console display">
         <div className="display-switcher-copy"><span>Display</span><strong>Training console</strong></div>
@@ -532,6 +563,7 @@ export default function Home() {
             <button className={trainingDisplay === value ? "active" : ""} key={value} onClick={() => setTrainingDisplay(value)} type="button"><strong>{label}</strong><small>{description}</small></button>
           ))}
         </div>
+        <ThemePicker onChange={changeTheme} theme={theme} />
       </section>
 
       <section className="builder-grid" id="builder">
