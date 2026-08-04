@@ -16,6 +16,7 @@ The Boat Planner supports device-only JSON/CSV roster imports, manual roster ent
 drag-and-drop seating for one to four boats, balanced or strongest-first suggestions,
 saved lineups, and crew-safe or coach-detail boat cards.
 
-Both consoles provide four working display modes. Training plans print as either a
-one-page dockside run sheet or a detailed coaching plan. Boat plans print one boat
-per landscape page using a top-down dragon boat layout.
+Both consoles provide four working display modes and independent Dark, Light, and
+Neo Minimal colour themes. Training plans print as either a one-page dockside run
+sheet or a detailed coaching plan. Boat plans print one boat per landscape page
+using a vertical, bow-to-stern dragon boat layout.
