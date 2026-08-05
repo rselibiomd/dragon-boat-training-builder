@@ -49,8 +49,30 @@ type SavedLineup = {
   savedAt: string;
   strategy: Strategy;
   compositionRule: CompositionRule;
+  snapshot?: LineupSnapshot;
   boats: Boat[];
   paddlers: Paddler[];
+};
+
+type LineupSnapshot = {
+  boatCount: number;
+  strategy: Strategy;
+  compositionRule: CompositionRule;
+  generatedAt: string;
+};
+
+type BoatDraft = {
+  version: 1;
+  paddlers: Paddler[];
+  boatCount: number;
+  strategy: Strategy;
+  compositionRule: CompositionRule;
+  boats: Boat[];
+  spares: Paddler[];
+  lineupName: string;
+  lineupSnapshot: LineupSnapshot | null;
+  rebuildNeeded: boolean;
+  savedAt: string;
 };
 
 type SeatSide = "left" | "right";
@@ -478,6 +500,9 @@ function downloadText(filename: string, contents: string) {
 }
 
 const CSV_HEADERS = ["name", "participating", "side_pref", "side_exclusive", "weight_kg", "preferred_position", "gender", "experience", "timing", "connection", "power", "stability", "consistency", "notes"];
+const ROSTER_KEY = "kdbc-boat-roster-v1";
+const LINEUPS_KEY = "kdbc-saved-lineups-v1";
+const DRAFT_KEY = "kdbc-boat-draft-v1";
 
 export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) {
   const [paddlers, setPaddlers] = useState<Paddler[]>([]);
@@ -503,14 +528,33 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
   const [printDate, setPrintDate] = useState(new Date().toISOString().slice(0, 10));
   const [printNotes, setPrintNotes] = useState("");
   const [boatDisplay, setBoatDisplay] = useState<BoatDisplay>("planner");
+  const [lineupSnapshot, setLineupSnapshot] = useState<LineupSnapshot | null>(null);
+  const [rebuildNeeded, setRebuildNeeded] = useState(false);
+  const [undoStack, setUndoStack] = useState<Boat[][]>([]);
+  const [redoStack, setRedoStack] = useState<Boat[][]>([]);
   const touchDragRef = useRef<TouchDrag | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
-        const storedRoster = JSON.parse(window.localStorage.getItem("kdbc-boat-roster-v1") ?? "[]");
-        setPaddlers(Array.isArray(storedRoster) ? normalizeRoster(storedRoster) : []);
-        setSavedLineups(JSON.parse(window.localStorage.getItem("kdbc-saved-lineups-v1") ?? "[]"));
+        const storedRoster = JSON.parse(window.localStorage.getItem(ROSTER_KEY) ?? "[]");
+        const storedLineups = JSON.parse(window.localStorage.getItem(LINEUPS_KEY) ?? "[]");
+        const storedDraft = JSON.parse(window.localStorage.getItem(DRAFT_KEY) ?? "null") as BoatDraft | null;
+        setSavedLineups(Array.isArray(storedLineups) ? storedLineups : []);
+        if (storedDraft?.version === 1 && Array.isArray(storedDraft.paddlers)) {
+          const restoredRoster = normalizeRoster(storedDraft.paddlers);
+          setPaddlers(restoredRoster);
+          setBoatCount(storedDraft.boatCount || 1);
+          setStrategy(storedDraft.strategy || "balanced");
+          setCompositionRule(storedDraft.compositionRule || "count");
+          setBoats(Array.isArray(storedDraft.boats) ? storedDraft.boats : []);
+          setSpares(Array.isArray(storedDraft.spares) ? storedDraft.spares : []);
+          setLineupName(storedDraft.lineupName || "Practice lineup");
+          setLineupSnapshot(storedDraft.lineupSnapshot ?? null);
+          setRebuildNeeded(Boolean(storedDraft.rebuildNeeded));
+        } else {
+          setPaddlers(Array.isArray(storedRoster) ? normalizeRoster(storedRoster) : []);
+        }
       } catch {
         setPaddlers([]);
       }
@@ -520,17 +564,66 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
   }, []);
 
   useEffect(() => {
-    if (hydrated) window.localStorage.setItem("kdbc-boat-roster-v1", JSON.stringify(paddlers));
+    if (hydrated) window.localStorage.setItem(ROSTER_KEY, JSON.stringify(paddlers));
   }, [paddlers, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const draft: BoatDraft = {
+      version: 1,
+      paddlers,
+      boatCount,
+      strategy,
+      compositionRule,
+      boats,
+      spares,
+      lineupName,
+      lineupSnapshot,
+      rebuildNeeded,
+      savedAt: new Date().toISOString(),
+    };
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  }, [boatCount, boats, compositionRule, hydrated, lineupName, lineupSnapshot, paddlers, rebuildNeeded, spares, strategy]);
 
   const participating = useMemo(() => paddlers.filter((paddler) => paddler.participating), [paddlers]);
   const paddlerMap = useMemo(() => new Map(paddlers.map((paddler) => [paddler.id, paddler])), [paddlers]);
   const filteredPaddlers = useMemo(() => paddlers.filter((paddler) => paddler.name.toLowerCase().includes(search.toLowerCase())), [paddlers, search]);
 
-  function replaceRoster(next: Paddler[]) {
+  function derivedLineup(nextBoats: Boat[], roster: Paddler[], rule: CompositionRule) {
+    const map = new Map(roster.map((paddler) => [paddler.id, paddler]));
+    const attending = roster.filter((paddler) => paddler.participating);
+    const refreshed = nextBoats.map((boat) => ({
+      ...boat,
+      seats: boat.seats.map((seat) => ({
+        ...seat,
+        leftId: seat.leftId && map.get(seat.leftId)?.participating ? seat.leftId : null,
+        rightId: seat.rightId && map.get(seat.rightId)?.participating ? seat.rightId : null,
+        leftLocked: Boolean(seat.leftId && map.get(seat.leftId)?.participating && seat.leftLocked),
+        rightLocked: Boolean(seat.rightId && map.get(seat.rightId)?.participating && seat.rightLocked),
+      })),
+    }));
+    refreshed.forEach((boat) => { boat.warnings = boatWarnings(boat, map, rule); });
+    const assigned = new Set(refreshed.flatMap((boat) => boat.seats.flatMap((seat) => [seat.leftId, seat.rightId])).filter(Boolean));
+    return { boats: refreshed, spares: attending.filter((paddler) => !assigned.has(paddler.id)) };
+  }
+
+  function replaceRoster(next: Paddler[], options: { clearLineup?: boolean } = {}) {
     setPaddlers(next);
-    setBoats([]);
-    setSpares([]);
+    if (options.clearLineup) {
+      setBoats([]);
+      setSpares([]);
+      setLineupSnapshot(null);
+      setRebuildNeeded(false);
+      setUndoStack([]);
+      setRedoStack([]);
+      return;
+    }
+    if (boats.length) {
+      const derived = derivedLineup(boats, next, compositionRule);
+      setBoats(derived.boats);
+      setSpares(derived.spares);
+      setRebuildNeeded(true);
+    }
   }
 
   function showNotice(message: string) {
@@ -548,7 +641,7 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
       const rows = Array.isArray(raw) ? raw : Array.isArray(raw?.paddlers) ? raw.paddlers : [];
       const next = normalizeRoster(rows);
       if (!next.length) throw new Error("No paddlers were found in that file.");
-      replaceRoster(next);
+      replaceRoster(next, { clearLineup: true });
       setRosterOpen(true);
       setError("");
       const attending = next.filter((paddler) => paddler.participating).length;
@@ -597,6 +690,10 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
       const result = createBoats(paddlers, boatCount, strategy, compositionRule, boats);
       setBoats(result.boats);
       setSpares(result.spares);
+      setLineupSnapshot({ boatCount, strategy, compositionRule, generatedAt: new Date().toISOString() });
+      setRebuildNeeded(false);
+      setUndoStack([]);
+      setRedoStack([]);
       window.setTimeout(() => document.getElementById("boat-lineups")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The boats could not be generated.");
@@ -606,6 +703,17 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
   function changeCompositionRule(nextRule: CompositionRule) {
     setCompositionRule(nextRule);
     setBoats((current) => current.map((boat) => ({ ...boat, warnings: boatWarnings(boat, paddlerMap, nextRule) })));
+    if (boats.length && lineupSnapshot?.compositionRule !== nextRule) setRebuildNeeded(true);
+  }
+
+  function changeBoatCount(nextCount: number) {
+    setBoatCount(nextCount);
+    if (boats.length && lineupSnapshot?.boatCount !== nextCount) setRebuildNeeded(true);
+  }
+
+  function changeStrategy(nextStrategy: Strategy) {
+    setStrategy(nextStrategy);
+    if (boats.length && lineupSnapshot?.strategy !== nextStrategy) setRebuildNeeded(true);
   }
 
   function toggleLock(boatIndex: number, rowIndex: number, side: SeatSide) {
@@ -615,11 +723,14 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
     }));
   }
 
-  function finishBoatEdit(next: Boat[]) {
-    next.forEach((boat) => { boat.warnings = boatWarnings(boat, paddlerMap, compositionRule); });
-    const nextAssigned = new Set(next.flatMap((boat) => boat.seats.flatMap((seat) => [seat.leftId, seat.rightId])).filter(Boolean));
-    setBoats(next);
-    setSpares(participating.filter((paddler) => !nextAssigned.has(paddler.id)));
+  function finishBoatEdit(next: Boat[], options: { recordHistory?: boolean } = {}) {
+    const derived = derivedLineup(next, paddlers, compositionRule);
+    if (options.recordHistory !== false && boats.length) {
+      setUndoStack((current) => [...current.slice(-9), structuredClone(boats) as Boat[][][number]]);
+      setRedoStack([]);
+    }
+    setBoats(derived.boats);
+    setSpares(derived.spares);
   }
 
   function movePaddlerToSeat(paddlerId: string, boatIndex: number, rowIndex: number, side: SeatSide) {
@@ -688,6 +799,24 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
     showNotice("All paddlers moved to the roster bench");
   }
 
+  function undoBoatEdit() {
+    const previous = undoStack.at(-1);
+    if (!previous) return;
+    setUndoStack((current) => current.slice(0, -1));
+    setRedoStack((current) => [...current.slice(-9), structuredClone(boats) as Boat[]]);
+    finishBoatEdit(structuredClone(previous) as Boat[], { recordHistory: false });
+    showNotice("Seating change undone");
+  }
+
+  function redoBoatEdit() {
+    const next = redoStack.at(-1);
+    if (!next) return;
+    setRedoStack((current) => current.slice(0, -1));
+    setUndoStack((current) => [...current.slice(-9), structuredClone(boats) as Boat[]]);
+    finishBoatEdit(structuredClone(next) as Boat[], { recordHistory: false });
+    showNotice("Seating change redone");
+  }
+
   function swapSeat(boatIndex: number, rowIndex: number, side: SeatSide, nextId: string) {
     if (nextId) movePaddlerToSeat(nextId, boatIndex, rowIndex, side);
   }
@@ -752,34 +881,54 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
       id: String(Date.now()),
       name: lineupName.trim() || "Boat lineup",
       savedAt: new Date().toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" }),
-      strategy,
-      compositionRule,
+      strategy: lineupSnapshot?.strategy ?? strategy,
+      compositionRule: lineupSnapshot?.compositionRule ?? compositionRule,
+      snapshot: lineupSnapshot ?? { boatCount, strategy, compositionRule, generatedAt: new Date().toISOString() },
       boats,
       paddlers,
     };
     const next = [saved, ...savedLineups].slice(0, 20);
     setSavedLineups(next);
-    window.localStorage.setItem("kdbc-saved-lineups-v1", JSON.stringify(next));
+    window.localStorage.setItem(LINEUPS_KEY, JSON.stringify(next));
     showNotice("Lineup saved on this device");
   }
 
   function loadLineup(saved: SavedLineup) {
     setPaddlers(saved.paddlers);
     setBoats(saved.boats);
-    setBoatCount(saved.boats.length);
+    setBoatCount(saved.snapshot?.boatCount ?? saved.boats.length);
     setStrategy(saved.strategy);
     setCompositionRule(saved.compositionRule);
     setLineupName(saved.name);
+    setLineupSnapshot(saved.snapshot ?? { boatCount: saved.boats.length, strategy: saved.strategy, compositionRule: saved.compositionRule, generatedAt: new Date().toISOString() });
+    setRebuildNeeded(false);
+    setUndoStack([]);
+    setRedoStack([]);
     const assigned = new Set(saved.boats.flatMap((boat) => boat.seats.flatMap((seat) => [seat.leftId, seat.rightId])).filter(Boolean));
     setSpares(saved.paddlers.filter((paddler) => paddler.participating && !assigned.has(paddler.id)));
     setSavedOpen(false);
     showNotice("Saved lineup loaded");
   }
 
+  function duplicateLineup(saved: SavedLineup) {
+    const copy = { ...structuredClone(saved), id: String(Date.now()), name: `${saved.name} copy`, savedAt: new Date().toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" }) };
+    const next = [copy, ...savedLineups].slice(0, 20);
+    setSavedLineups(next);
+    window.localStorage.setItem(LINEUPS_KEY, JSON.stringify(next));
+    showNotice("Lineup duplicated");
+  }
+
+  function deleteLineup(id: string) {
+    const next = savedLineups.filter((saved) => saved.id !== id);
+    setSavedLineups(next);
+    window.localStorage.setItem(LINEUPS_KEY, JSON.stringify(next));
+    showNotice("Lineup deleted");
+  }
+
   async function copyLineup() {
     const output = [
       lineupName.toUpperCase(),
-      `${strategy === "balanced" ? "Balanced boats" : "Strongest-first"} · ${boats.length} boat${boats.length === 1 ? "" : "s"}`,
+      `${strategyText}${rebuildNeeded ? " · rebuild recommended" : ""} · ${boats.length} boat${boats.length === 1 ? "" : "s"}`,
       "",
       ...boats.flatMap((boat) => [
         boat.name.toUpperCase(),
@@ -808,6 +957,8 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
   const selectablePaddlers = [...participating].sort((a, b) => a.name.localeCompare(b.name));
   const plannedSeats = Math.min(Math.floor(participating.length / 2) * 2, boatCount * 20);
   const potentialSpares = Math.max(0, participating.length - plannedSeats);
+  const printedStrategy = lineupSnapshot?.strategy ?? strategy;
+  const strategyText = printedStrategy === "balanced" ? "Balanced boats" : "Strongest-first";
 
   return (
     <section className={`boat-planner-shell boat-display-${boatDisplay}`}>
@@ -862,7 +1013,7 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
         <section className="setup-card">
           <div className="setup-heading"><div><span>2</span><h2>Boat setup</h2></div></div>
           <div className="boat-count-row" role="group" aria-label="Number of boats">
-            {[1, 2, 3, 4].map((count) => <button className={boatCount === count ? "active" : ""} key={count} onClick={() => setBoatCount(count)} type="button"><strong>{count}</strong><small>{count === 1 ? "boat" : "boats"}</small></button>)}
+            {[1, 2, 3, 4].map((count) => <button className={boatCount === count ? "active" : ""} key={count} onClick={() => changeBoatCount(count)} type="button"><strong>{count}</strong><small>{count === 1 ? "boat" : "boats"}</small></button>)}
           </div>
           <label className="planner-field"><span>Lineup name</span><input onChange={(event) => setLineupName(event.target.value)} value={lineupName} /></label>
           <p className="capacity-note">Requires at least {boatCount * 10} paddlers; maximum {boatCount * 20}. Odd or excess paddlers become spares.</p>
@@ -871,8 +1022,8 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
         <section className="setup-card">
           <div className="setup-heading"><div><span>3</span><h2>Recommendation</h2></div></div>
           <div className="strategy-toggle" role="group" aria-label="Boat strategy">
-            <button className={strategy === "balanced" ? "active" : ""} onClick={() => setStrategy("balanced")} type="button"><strong>Balanced boats</strong><small>Distribute overall crew strength</small></button>
-            <button className={strategy === "strongest" ? "active" : ""} onClick={() => setStrategy("strongest")} type="button"><strong>Strongest-first</strong><small>Rank Boat 1 before the next</small></button>
+            <button className={strategy === "balanced" ? "active" : ""} onClick={() => changeStrategy("balanced")} type="button"><strong>Balanced boats</strong><small>Distribute overall crew strength</small></button>
+            <button className={strategy === "strongest" ? "active" : ""} onClick={() => changeStrategy("strongest")} type="button"><strong>Strongest-first</strong><small>Rank Boat 1 before the next</small></button>
           </div>
           <label className="planner-field"><span>Composition check</span><select onChange={(event) => changeCompositionRule(event.target.value as CompositionRule)} value={compositionRule}><option value="count">Show counts only</option><option value="mixed">Mixed: at least 50% women</option><option value="women">Women’s crew</option></select></label>
           <p className="capacity-note">Composition is a visible check, not a seating score.</p>
@@ -888,9 +1039,16 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
 
       {boats.length > 0 && (
         <section className="lineup-section" id="boat-lineups">
+          {rebuildNeeded && (
+            <div className="rebuild-banner" role="status">
+              <strong>Settings or attendance changed.</strong>
+              <span>The current seats are preserved, but rebuild unlocked seats before treating this as a fresh recommendation.</span>
+              <button onClick={generate} type="button">Rebuild now</button>
+            </div>
+          )}
           <div className="lineup-heading">
             <div><p className="eyebrow">Coach review required</p><h2>{lineupName}</h2><p>Drag paddlers between seats and boats, or drag them back to the roster bench. Lock seats only when you want to protect them from a rebuild.</p></div>
-            <div className="lineup-actions"><button onClick={generate} type="button">↻ Rebuild unlocked</button><button onClick={clearSeatsForManualPlanning} type="button">Start manual</button><button onClick={saveLineup} type="button">♡ Save</button><button onClick={copyLineup} type="button">▣ Copy</button><button onClick={openPrintOptions} type="button">▤ Print</button><button onClick={() => setSavedOpen(true)} type="button">Saved lineups</button></div>
+            <div className="lineup-actions"><button onClick={generate} type="button">↻ Rebuild unlocked</button><button onClick={clearSeatsForManualPlanning} type="button">Start manual</button><button disabled={!undoStack.length} onClick={undoBoatEdit} type="button">↶ Undo</button><button disabled={!redoStack.length} onClick={redoBoatEdit} type="button">↷ Redo</button><button onClick={saveLineup} type="button">♡ Save</button><button onClick={copyLineup} type="button">▣ Copy</button><button onClick={openPrintOptions} type="button">▤ Print</button><button onClick={() => setSavedOpen(true)} type="button">Saved lineups</button></div>
           </div>
 
           <div
@@ -1029,7 +1187,19 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
       )}
 
       {savedOpen && (
-        <div className="drawer-backdrop" onMouseDown={() => setSavedOpen(false)}><aside className="library-drawer" onMouseDown={(event) => event.stopPropagation()}><div className="drawer-heading"><div><p className="eyebrow">This device</p><h2>Saved lineups</h2></div><button aria-label="Close saved lineups" onClick={() => setSavedOpen(false)} type="button">×</button></div>{savedLineups.length ? <div className="saved-list">{savedLineups.map((saved) => <button key={saved.id} onClick={() => loadLineup(saved)} type="button"><span><strong>{saved.name}</strong><small>{saved.boats.length} boat{saved.boats.length === 1 ? "" : "s"} · {saved.savedAt}</small></span><b>Load →</b></button>)}</div> : <div className="empty-state"><span>▱</span><h3>No saved lineups yet</h3><p>Save a generated lineup and it will appear here.</p></div>}</aside></div>
+        <div className="drawer-backdrop" onMouseDown={() => setSavedOpen(false)}>
+          <aside className="library-drawer" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="drawer-heading"><div><p className="eyebrow">This device</p><h2>Saved lineups</h2></div><button aria-label="Close saved lineups" onClick={() => setSavedOpen(false)} type="button">×</button></div>
+            {savedLineups.length ? (
+              <div className="saved-list saved-list-manage">{savedLineups.map((saved) => (
+                <article key={saved.id}>
+                  <button onClick={() => loadLineup(saved)} type="button"><span><strong>{saved.name}</strong><small>{saved.boats.length} boat{saved.boats.length === 1 ? "" : "s"} · {saved.savedAt}</small></span><b>Load →</b></button>
+                  <div><button onClick={() => duplicateLineup(saved)} type="button">Duplicate</button><button onClick={() => deleteLineup(saved.id)} type="button">Delete</button></div>
+                </article>
+              ))}</div>
+            ) : <div className="empty-state"><span>▱</span><h3>No saved lineups yet</h3><p>Save a generated lineup and it will appear here.</p></div>}
+          </aside>
+        </div>
       )}
 
       {printOpen && (
@@ -1061,7 +1231,7 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
                 <img src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/kdbc-logo.jpeg`} alt="Kingston Dragon Boat Club" />
                 <div><span>{printVariant === "coach" ? "Coach-detail lineup" : "Crew boat card"}</span><strong>Boat {boatIndex + 1} of {boats.length}</strong></div>
               </header>
-              <div className="boat-print-title"><div><p>{strategy === "balanced" ? "Balanced boats" : "Strongest-first"} · {members.length} paddlers</p><h1>{lineupName} · {boat.name}</h1></div><div><span>Lineup date</span><strong>{printDate || "Not set"}</strong></div></div>
+              <div className="boat-print-title"><div><p>{strategyText}{rebuildNeeded ? " · rebuild recommended" : ""} · {members.length} paddlers</p><h1>{lineupName} · {boat.name}</h1></div><div><span>Lineup date</span><strong>{printDate || "Not set"}</strong></div></div>
               {printNotes && <div className="boat-print-note"><b>Coach note</b><span>{printNotes}</span></div>}
 
               <div className="dragon-boat-diagram" aria-label={`${boat.name} top-down seating plan`}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import BoatPlanner from "./boat-planner";
 
 type Focus = "Stability" | "Connection" | "Timing" | "Power" | "Speed";
@@ -28,13 +28,16 @@ type SessionBlock = {
 
 type SavedPlan = {
   id: string;
+  title?: string;
   savedAt: string;
   focus: Focus | LegacyFocus;
   duration: number;
   crew: Crew;
   festivalWeeks: number;
   emphasis: Emphasis;
+  variation?: number;
   notes: string;
+  blocks?: SessionBlock[];
 };
 
 type TrainingPrintVariant = "run-sheet" | "detailed";
@@ -402,6 +405,14 @@ function PaddleMark() {
   return <span className="paddle-mark" aria-hidden="true"><span /></span>;
 }
 
+function downloadJson(filename: string, data: unknown) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json;charset=utf-8" }));
+  link.download = filename;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(link.href), 0);
+}
+
 function ThemePicker({ theme, onChange }: { theme: ConsoleTheme; onChange: (theme: ConsoleTheme) => void }) {
   return (
     <div className="theme-picker" role="group" aria-label="Console colour theme">
@@ -437,6 +448,8 @@ export default function Home() {
   const [printDate, setPrintDate] = useState(new Date().toISOString().slice(0, 10));
   const [trainingDisplay, setTrainingDisplay] = useState<TrainingDisplay>("builder");
   const [theme, setTheme] = useState<ConsoleTheme>("light");
+  const [loadedBlocks, setLoadedBlocks] = useState<SessionBlock[] | null>(null);
+  const [loadedPlanTitle, setLoadedPlanTitle] = useState("");
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("kdbc-console-theme");
@@ -445,11 +458,42 @@ export default function Home() {
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  const session = useMemo(
+  const generatedSession = useMemo(
     () => buildSession(focus, duration, crew, festivalWeeks, emphasis, variation),
     [focus, duration, crew, festivalWeeks, emphasis, variation],
   );
+  const session = loadedBlocks ?? generatedSession;
   const total = session.reduce((sum, block) => sum + block.minutes, 0);
+
+  function clearLoadedPractice() {
+    setLoadedBlocks(null);
+    setLoadedPlanTitle("");
+  }
+
+  function updateFocus(next: Focus) {
+    clearLoadedPractice();
+    setFocus(next);
+  }
+
+  function updateDuration(next: number) {
+    clearLoadedPractice();
+    setDuration(next);
+  }
+
+  function updateCrew(next: Crew) {
+    clearLoadedPractice();
+    setCrew(next);
+  }
+
+  function updateFestivalWeeks(next: number) {
+    clearLoadedPractice();
+    setFestivalWeeks(next);
+  }
+
+  function updateEmphasis(next: Emphasis) {
+    clearLoadedPractice();
+    setEmphasis(next);
+  }
 
   function showNotice(message: string) {
     setNotice(message);
@@ -457,6 +501,7 @@ export default function Home() {
   }
 
   function generateSession() {
+    clearLoadedPractice();
     setVariation((value) => value + 1);
     window.setTimeout(() => document.getElementById("full-plan")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
   }
@@ -471,13 +516,16 @@ export default function Home() {
     const saved = JSON.parse(window.localStorage.getItem("dragonboat-plans") ?? "[]") as SavedPlan[];
     const plan: SavedPlan = {
       id: String(Date.now()),
+      title: loadedPlanTitle || `${focus} Practice`,
       savedAt: new Date().toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" }),
       focus,
       duration,
       crew,
       festivalWeeks,
       emphasis,
+      variation,
       notes,
+      blocks: session,
     };
     const next = [plan, ...saved].slice(0, 12);
     window.localStorage.setItem("dragonboat-plans", JSON.stringify(next));
@@ -492,7 +540,9 @@ export default function Home() {
     setFestivalWeeks(plan.festivalWeeks);
     setEmphasis(plan.emphasis);
     setNotes(plan.notes);
-    setVariation(0);
+    setVariation(plan.variation ?? 0);
+    setLoadedBlocks(plan.blocks ?? null);
+    setLoadedPlanTitle(plan.title || `${normalizeFocus(plan.focus)} Practice`);
     setLibraryOpen(false);
     showNotice("Saved practice loaded");
   }
@@ -532,6 +582,41 @@ export default function Home() {
     window.localStorage.setItem("kdbc-console-theme", nextTheme);
   }
 
+  function exportWorkspaceData() {
+    const keys = Object.keys(window.localStorage).filter((key) => key.startsWith("kdbc-") || key.startsWith("dragonboat-")).sort();
+    const data = Object.fromEntries(keys.map((key) => [key, window.localStorage.getItem(key)]));
+    downloadJson(`kdbc-coach-tools-backup-${new Date().toISOString().slice(0, 10)}.json`, {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      data,
+    });
+    showNotice("Backup downloaded");
+  }
+
+  async function importWorkspaceData(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      const data = parsed?.data && typeof parsed.data === "object" ? parsed.data as Record<string, string> : null;
+      if (!data) throw new Error("Backup file is missing its data section.");
+      Object.entries(data).forEach(([key, value]) => {
+        if ((key.startsWith("kdbc-") || key.startsWith("dragonboat-")) && typeof value === "string") window.localStorage.setItem(key, value);
+      });
+      showNotice("Backup restored. Reloading…");
+      window.setTimeout(() => window.location.reload(), 450);
+    } catch {
+      showNotice("Backup could not be restored");
+    }
+  }
+
+  function clearPrivateData() {
+    if (!window.confirm("Clear roster, saved practices, saved lineups, drafts, and display preferences from this device?")) return;
+    Object.keys(window.localStorage).filter((key) => key.startsWith("kdbc-") || key.startsWith("dragonboat-")).forEach((key) => window.localStorage.removeItem(key));
+    window.location.reload();
+  }
+
   return (
     <main className={`app-shell theme-${theme} training-display-${trainingDisplay}`}>
       <header className="topbar">
@@ -546,6 +631,11 @@ export default function Home() {
           <button className={module === "boats" ? "active" : ""} onClick={() => setModule("boats")} type="button">Boat Planner</button>
         </nav>
         {module === "training" ? <button className="saved-button" onClick={openLibrary} type="button" aria-label="Open saved practices"><span aria-hidden="true">▱</span> Saved practices</button> : <span className="device-badge">⌂ Device-only data</span>}
+        <div className="data-actions" aria-label="Device data controls">
+          <button onClick={exportWorkspaceData} type="button">Export data</button>
+          <label>Restore<input accept="application/json,.json" onChange={importWorkspaceData} type="file" /></label>
+          <button onClick={clearPrivateData} type="button">Clear</button>
+        </div>
         <div className="coach-avatar" title="Coach Nico" aria-label="Coach Nico">NS</div>
       </header>
 
@@ -578,7 +668,7 @@ export default function Home() {
             <label className="control-card">
               <span className="control-heading"><b>Session focus</b><i aria-hidden="true">◎</i></span>
               <span className="select-wrap"><PaddleMark />
-                <select aria-label="Session focus" value={focus} onChange={(event) => setFocus(event.target.value as Focus)}>
+                <select aria-label="Session focus" value={focus} onChange={(event) => updateFocus(event.target.value as Focus)}>
                   {FOCUSES.map((item) => <option key={item}>{item}</option>)}
                 </select>
               </span>
@@ -586,7 +676,7 @@ export default function Home() {
             <label className="control-card">
               <span className="control-heading"><b>Duration</b><i aria-hidden="true">◷</i></span>
               <span className="select-wrap plain">
-                <select aria-label="Duration" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
+                <select aria-label="Duration" value={duration} onChange={(event) => updateDuration(Number(event.target.value))}>
                   {DURATIONS.map((item) => <option key={item} value={item}>{item} min</option>)}
                 </select>
               </span>
@@ -594,7 +684,7 @@ export default function Home() {
             <label className="control-card">
               <span className="control-heading"><b>Crew</b><i aria-hidden="true">♙</i></span>
               <span className="select-wrap plain">
-                <select aria-label="Crew" value={crew} onChange={(event) => setCrew(event.target.value as Crew)}>
+                <select aria-label="Crew" value={crew} onChange={(event) => updateCrew(event.target.value as Crew)}>
                   {CREWS.map((item) => <option key={item}>{item}</option>)}
                 </select>
               </span>
@@ -606,7 +696,7 @@ export default function Home() {
               <div><h2>Festival proximity</h2><strong>{festivalWeeks === 0 ? "Race day" : `${festivalWeeks} week${festivalWeeks === 1 ? "" : "s"}`}</strong></div>
               <span aria-hidden="true">▦</span>
             </div>
-            <input aria-label="Weeks until festival" max={WEEKS.length - 1} min="0" onChange={(event) => setFestivalWeeks(WEEKS[Number(event.target.value)])} type="range" value={WEEKS.indexOf(festivalWeeks)} />
+            <input aria-label="Weeks until festival" max={WEEKS.length - 1} min="0" onChange={(event) => updateFestivalWeeks(WEEKS[Number(event.target.value)])} type="range" value={WEEKS.indexOf(festivalWeeks)} />
             <div className="range-labels" aria-hidden="true">
               {WEEKS.map((week) => <span className={festivalWeeks === week ? "selected" : ""} key={week}>{week === 0 ? "Race day" : `${week}w`}</span>)}
             </div>
@@ -640,7 +730,7 @@ export default function Home() {
 
       <section className="full-plan" id="full-plan">
         <div className="plan-heading">
-          <div><p className="eyebrow">Ready to coach</p><h2>Your complete practice</h2><p>Each practice uses two or three drills from the KDBC cue-card system, followed by one focused main set.</p></div>
+          <div><p className="eyebrow">Ready to coach</p><h2>{loadedPlanTitle || "Your complete practice"}</h2><p>{loadedBlocks ? "Loaded exactly as saved on this device. Change a setting or rebuild when you want a new version." : "Each practice uses two or three drills from the KDBC cue-card system, followed by one focused main set."}</p></div>
           <div className="plan-actions">
             <button onClick={savePlan} type="button">♡ Save</button>
             <button onClick={copyPlan} type="button">▣ Copy</button>
@@ -651,7 +741,7 @@ export default function Home() {
         <div className="emphasis-panel">
           <div><strong>Technical emphasis</strong><span>Optional. “Auto” chooses drills for the session focus. Select “Starts / Race” only when you want race work.</span></div>
           <div className="chip-row" role="group" aria-label="Technical emphasis">
-            {EMPHASES.map((item) => <button className={emphasis === item ? "active" : ""} key={item} onClick={() => setEmphasis(item)} type="button">{emphasisLabel(item)}</button>)}
+            {EMPHASES.map((item) => <button className={emphasis === item ? "active" : ""} key={item} onClick={() => updateEmphasis(item)} type="button">{emphasisLabel(item)}</button>)}
           </div>
         </div>
 
@@ -661,7 +751,7 @@ export default function Home() {
               <article className="detail-card" key={`${block.id}-${block.detail}`}>
                 <div className="detail-number">{String(index + 1).padStart(2, "0")}</div>
                 <div className="detail-content">
-                  <div className="detail-title"><div><span>{block.minutes} minutes</span><h3>{block.name}</h3><p>{block.detail}</p></div>{block.id.startsWith("drill-") && <button onClick={() => setVariation((value) => value + 1)} type="button">↻ New drill mix</button>}</div>
+                  <div className="detail-title"><div><span>{block.minutes} minutes</span><h3>{block.name}</h3><p>{block.detail}</p></div>{block.id.startsWith("drill-") && <button onClick={() => { clearLoadedPractice(); setVariation((value) => value + 1); }} type="button">↻ New drill mix</button>}</div>
                   <div className="detail-grid">
                     <div><h4>Purpose</h4><p>{block.objective}</p></div>
                     <div><h4>Set</h4><p>{block.set}</p></div>
@@ -692,7 +782,7 @@ export default function Home() {
           <aside className="library-drawer" aria-label="Saved practices" onMouseDown={(event) => event.stopPropagation()}>
             <div className="drawer-heading"><div><p className="eyebrow">This device</p><h2>Saved practices</h2></div><button aria-label="Close saved practices" onClick={() => setLibraryOpen(false)} type="button">×</button></div>
             {savedPlans.length === 0 ? <div className="empty-state"><span>▱</span><h3>No saved practices yet</h3><p>Save a session and it will appear here for quick reuse.</p></div> : (
-              <div className="saved-list">{savedPlans.map((plan) => <button key={plan.id} onClick={() => loadPlan(plan)} type="button"><span><strong>{normalizeFocus(plan.focus)} · {plan.duration} min</strong><small>{plan.crew} crew · {plan.savedAt}</small></span><b>Load →</b></button>)}</div>
+              <div className="saved-list">{savedPlans.map((plan) => <button key={plan.id} onClick={() => loadPlan(plan)} type="button"><span><strong>{plan.title || `${normalizeFocus(plan.focus)} · ${plan.duration} min`}</strong><small>{plan.crew} crew · {plan.duration} min · {plan.savedAt}</small></span><b>Load →</b></button>)}</div>
             )}
           </aside>
         </div>
