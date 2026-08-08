@@ -12,6 +12,7 @@ type Strategy = "balanced" | "strongest";
 type CompositionRule = "count" | "mixed" | "women";
 type BoatPrintVariant = "crew" | "coach";
 type BoatDisplay = "planner" | "seating" | "analysis" | "compact";
+type RatingConfidence = "Low" | "Medium" | "High";
 
 type Paddler = {
   id: string;
@@ -24,6 +25,8 @@ type Paddler = {
   gender: Gender;
   experience: Experience;
   ratings: Record<RatingKey, number | null>;
+  ratingAssessedAt: string;
+  ratingConfidence: RatingConfidence;
   notes: string;
 };
 
@@ -87,6 +90,8 @@ type TouchDrag = {
 type BoatPlannerProps = {
   theme: ConsoleTheme;
   onThemeChange: (theme: ConsoleTheme) => void;
+  sessionTitle: string;
+  sessionDate: string;
 };
 
 const RATING_KEYS: RatingKey[] = ["timing", "connection", "power", "stability", "consistency"];
@@ -97,6 +102,13 @@ const RATING_LABELS: Record<RatingKey, string> = {
   stability: "Stability / boat control",
   consistency: "Consistency under load",
 };
+const RATING_ANCHORS = [
+  "1 — Needs direct support to perform the skill safely or consistently",
+  "2 — Emerging; performs it intermittently with frequent cueing",
+  "3 — Reliable baseline at controlled training load",
+  "4 — Strong and repeatable under higher load or rate",
+  "5 — Crew-leading quality that remains dependable under pressure",
+];
 
 const emptyRatings = (): Record<RatingKey, number | null> => ({
   timing: null,
@@ -117,6 +129,8 @@ const newPaddler = (): Paddler => ({
   gender: "Unknown",
   experience: "Unknown",
   ratings: emptyRatings(),
+  ratingAssessedAt: "",
+  ratingConfidence: "Low",
   notes: "",
 });
 
@@ -206,6 +220,8 @@ function normalizePaddler(raw: Record<string, unknown>, index: number): Paddler 
       stability: asRating(rating("stability", "boat_control", "stability_rating")),
       consistency: asRating(rating("consistency", "consistency_under_load", "consistency_rating")),
     },
+    ratingAssessedAt: String(pick("rating_assessed_at", "assessment_date", "rating date") ?? ""),
+    ratingConfidence: (["Low", "Medium", "High"].includes(String(pick("rating_confidence", "confidence") ?? "")) ? String(pick("rating_confidence", "confidence")) : "Low") as RatingConfidence,
     notes: String(pick("notes", "coach_notes") ?? ""),
   };
 }
@@ -499,12 +515,12 @@ function downloadText(filename: string, contents: string) {
   window.setTimeout(() => URL.revokeObjectURL(link.href), 0);
 }
 
-const CSV_HEADERS = ["name", "participating", "side_pref", "side_exclusive", "weight_kg", "preferred_position", "gender", "experience", "timing", "connection", "power", "stability", "consistency", "notes"];
+const CSV_HEADERS = ["name", "participating", "side_pref", "side_exclusive", "weight_kg", "preferred_position", "gender", "experience", "timing", "connection", "power", "stability", "consistency", "rating_assessed_at", "rating_confidence", "notes"];
 const ROSTER_KEY = "kdbc-boat-roster-v1";
 const LINEUPS_KEY = "kdbc-saved-lineups-v1";
 const DRAFT_KEY = "kdbc-boat-draft-v1";
 
-export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) {
+export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessionDate }: BoatPlannerProps) {
   const [paddlers, setPaddlers] = useState<Paddler[]>([]);
   const [boatCount, setBoatCount] = useState(1);
   const [strategy, setStrategy] = useState<Strategy>("balanced");
@@ -516,7 +532,7 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
   const [savedLineups, setSavedLineups] = useState<SavedLineup[]>([]);
   const [editing, setEditing] = useState<Paddler | null>(null);
   const [search, setSearch] = useState("");
-  const [lineupName, setLineupName] = useState("Practice lineup");
+  const [lineupName, setLineupName] = useState(`${sessionTitle} lineup`);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [hydrated, setHydrated] = useState(false);
@@ -540,7 +556,7 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
         const storedRoster = JSON.parse(window.localStorage.getItem(ROSTER_KEY) ?? "[]");
         const storedLineups = JSON.parse(window.localStorage.getItem(LINEUPS_KEY) ?? "[]");
         const storedDraft = JSON.parse(window.localStorage.getItem(DRAFT_KEY) ?? "null") as BoatDraft | null;
-        setSavedLineups(Array.isArray(storedLineups) ? storedLineups : []);
+        setSavedLineups(Array.isArray(storedLineups) ? storedLineups.map((saved: SavedLineup) => ({ ...saved, paddlers: normalizeRoster(saved.paddlers as unknown as Record<string, unknown>[]) })) : []);
         if (storedDraft?.version === 1 && Array.isArray(storedDraft.paddlers)) {
           const restoredRoster = normalizeRoster(storedDraft.paddlers);
           setPaddlers(restoredRoster);
@@ -561,6 +577,18 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
       setHydrated(true);
     }, 0);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const closeOverlays = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setRosterOpen(false);
+      setSavedOpen(false);
+      setEditing(null);
+      setPrintOpen(false);
+    };
+    window.addEventListener("keydown", closeOverlays);
+    return () => window.removeEventListener("keydown", closeOverlays);
   }, []);
 
   useEffect(() => {
@@ -652,7 +680,7 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
   }
 
   function downloadCsvTemplate() {
-    const example = ["Example Paddler", true, "Either", false, "", "Any", "Unknown", "Unknown", "", "", "", "", "", "Leave ratings blank when unknown"];
+    const example = ["Example Paddler", true, "Either", false, "", "Any", "Unknown", "Unknown", "", "", "", "", "", "", "Low", "Leave ratings blank when unknown"];
     downloadText("kdbc-roster-template.csv", `${CSV_HEADERS.join(",")}\n${example.map(csvCell).join(",")}\n`);
     showNotice("CSV template downloaded");
   }
@@ -668,6 +696,8 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
       paddler.gender,
       paddler.experience,
       ...RATING_KEYS.map((key) => paddler.ratings[key]),
+      paddler.ratingAssessedAt,
+      paddler.ratingConfidence,
       paddler.notes,
     ].map(csvCell).join(","));
     downloadText("kdbc-roster-export.csv", `${CSV_HEADERS.join(",")}\n${rows.join("\n")}\n`);
@@ -894,7 +924,8 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
   }
 
   function loadLineup(saved: SavedLineup) {
-    setPaddlers(saved.paddlers);
+    const restoredPaddlers = normalizeRoster(saved.paddlers as unknown as Record<string, unknown>[]);
+    setPaddlers(restoredPaddlers);
     setBoats(saved.boats);
     setBoatCount(saved.snapshot?.boatCount ?? saved.boats.length);
     setStrategy(saved.strategy);
@@ -905,7 +936,7 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
     setUndoStack([]);
     setRedoStack([]);
     const assigned = new Set(saved.boats.flatMap((boat) => boat.seats.flatMap((seat) => [seat.leftId, seat.rightId])).filter(Boolean));
-    setSpares(saved.paddlers.filter((paddler) => paddler.participating && !assigned.has(paddler.id)));
+    setSpares(restoredPaddlers.filter((paddler) => paddler.participating && !assigned.has(paddler.id)));
     setSavedOpen(false);
     showNotice("Saved lineup loaded");
   }
@@ -916,6 +947,15 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
     setSavedLineups(next);
     window.localStorage.setItem(LINEUPS_KEY, JSON.stringify(next));
     showNotice("Lineup duplicated");
+  }
+
+  function renameLineup(saved: SavedLineup) {
+    const name = window.prompt("Rename saved lineup", saved.name)?.trim();
+    if (!name) return;
+    const next = savedLineups.map((item) => item.id === saved.id ? { ...item, name } : item);
+    setSavedLineups(next);
+    window.localStorage.setItem(LINEUPS_KEY, JSON.stringify(next));
+    showNotice("Lineup renamed");
   }
 
   function deleteLineup(id: string) {
@@ -943,7 +983,7 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
   }
 
   function openPrintOptions() {
-    setPrintDate(new Date().toISOString().slice(0, 10));
+    setPrintDate(sessionDate || new Date().toISOString().slice(0, 10));
     setPrintOpen(true);
   }
 
@@ -967,6 +1007,7 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
           <p className="eyebrow">Boat planning console</p>
           <h1>Build the boats, then coach the crew.</h1>
           <p>Import attendance, apply your coaching ratings, and generate 1–4 complete-pair lineups without surrendering coaching judgment.</p>
+          <div className="active-session-chip"><span>Active session</span><strong>{sessionTitle}</strong><small>{sessionDate || "Date not set"}</small></div>
         </div>
         <div className="privacy-card"><span aria-hidden="true">⌂</span><div><strong>Device-only roster</strong><p>Names, weights, ratings, and saved lineups stay in this browser. Nothing is uploaded to the public site.</p></div></div>
       </div>
@@ -980,7 +1021,7 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
             ["analysis", "Coach analysis", "Profiles + checks"],
             ["compact", "Compact", "Multi-boat view"],
           ] as [BoatDisplay, string, string][]).map(([value, label, description]) => (
-            <button className={boatDisplay === value ? "active" : ""} key={value} onClick={() => setBoatDisplay(value)} type="button"><strong>{label}</strong><small>{description}</small></button>
+            <button aria-pressed={boatDisplay === value} className={boatDisplay === value ? "active" : ""} key={value} onClick={() => setBoatDisplay(value)} type="button"><strong>{label}</strong><small>{description}</small></button>
           ))}
         </div>
         <div className="theme-picker" role="group" aria-label="Console colour theme">
@@ -1154,8 +1195,8 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
 
       {rosterOpen && (
         <div className="drawer-backdrop" onMouseDown={() => setRosterOpen(false)}>
-          <aside className="roster-drawer" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="drawer-heading"><div><p className="eyebrow">Stored on this device</p><h2>Manage roster</h2></div><button aria-label="Close roster" onClick={() => setRosterOpen(false)} type="button">×</button></div>
+          <aside aria-label="Manage roster" aria-modal="true" className="roster-drawer" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+            <div className="drawer-heading"><div><p className="eyebrow">Stored on this device</p><h2>Manage roster</h2></div><button aria-label="Close roster" autoFocus onClick={() => setRosterOpen(false)} type="button">×</button></div>
             <div className="roster-tools"><input aria-label="Search paddlers" onChange={(event) => setSearch(event.target.value)} placeholder="Search paddlers…" value={search} /><button onClick={() => setEditing(newPaddler())} type="button">+ Add</button></div>
             <div className="roster-bulk-actions"><span>Attendance</span><button onClick={() => replaceRoster(paddlers.map((item) => ({ ...item, participating: true })))} type="button">Select all</button><button onClick={() => replaceRoster(paddlers.map((item) => ({ ...item, participating: false })))} type="button">Clear all</button><button onClick={exportRoster} type="button">Export CSV</button><button onClick={downloadCsvTemplate} type="button">CSV template</button></div>
             <div className="roster-list">
@@ -1167,7 +1208,7 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
 
       {editing && (
         <div className="drawer-backdrop" onMouseDown={() => setEditing(null)}>
-          <aside className="edit-drawer" onMouseDown={(event) => event.stopPropagation()}>
+          <aside aria-label="Edit paddler" aria-modal="true" className="edit-drawer" onMouseDown={(event) => event.stopPropagation()} role="dialog">
             <div className="drawer-heading"><div><p className="eyebrow">Coach profile</p><h2>{paddlers.some((item) => item.id === editing.id) ? "Edit paddler" : "Add paddler"}</h2></div><button aria-label="Close editor" onClick={() => setEditing(null)} type="button">×</button></div>
             <div className="edit-form">
               <label className="wide"><span>Name</span><input autoFocus onChange={(event) => setEditing({ ...editing, name: event.target.value })} value={editing.name} /></label>
@@ -1177,7 +1218,7 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
               <label><span>Preferred position</span><select onChange={(event) => setEditing({ ...editing, preferredPosition: event.target.value as Position })} value={editing.preferredPosition}><option>Any</option><option>Front</option><option>Middle</option><option>Back</option></select></label>
               <label><span>Gender / category</span><select onChange={(event) => setEditing({ ...editing, gender: event.target.value as Gender })} value={editing.gender}><option value="Unknown">Unknown</option><option value="F">Woman / F</option><option value="M">Man / M</option><option value="X">Another category / X</option></select></label>
               <label><span>Experience / role</span><select onChange={(event) => setEditing({ ...editing, experience: event.target.value as Experience })} value={editing.experience}><option>Unknown</option><option>Developing</option><option>Experienced</option><option>Pacer</option><option>Steer</option></select></label>
-              <div className="ratings-editor wide"><div><strong>Coaching ratings</strong><span>Leave unknown until you have enough evidence.</span></div>{RATING_KEYS.map((key) => <label key={key}><span>{RATING_LABELS[key]}</span><select onChange={(event) => setEditing({ ...editing, ratings: { ...editing.ratings, [key]: event.target.value ? Number(event.target.value) : null } })} value={editing.ratings[key] ?? ""}><option value="">Unknown</option>{[1, 2, 3, 4, 5].map((rating) => <option key={rating} value={rating}>{rating}</option>)}</select></label>)}</div>
+              <div className="ratings-editor wide"><div><strong>Coaching ratings</strong><span>Use the anchors below and leave unknown until you have enough evidence.</span></div>{RATING_KEYS.map((key) => <label key={key}><span>{RATING_LABELS[key]}</span><select onChange={(event) => setEditing({ ...editing, ratings: { ...editing.ratings, [key]: event.target.value ? Number(event.target.value) : null } })} value={editing.ratings[key] ?? ""}><option value="">Unknown</option>{RATING_ANCHORS.map((anchor, index) => <option key={anchor} value={index + 1}>{anchor}</option>)}</select></label>)}<div className="rating-evidence"><label><span>Assessment date</span><input onChange={(event) => setEditing({ ...editing, ratingAssessedAt: event.target.value })} type="date" value={editing.ratingAssessedAt} /></label><label><span>Evidence confidence</span><select onChange={(event) => setEditing({ ...editing, ratingConfidence: event.target.value as RatingConfidence })} value={editing.ratingConfidence}><option>Low</option><option>Medium</option><option>High</option></select></label></div><details className="rating-rubric"><summary>View 1–5 rating anchors</summary>{RATING_ANCHORS.map((anchor) => <p key={anchor}>{anchor}</p>)}</details></div>
               <label className="wide"><span>Coach notes</span><textarea onChange={(event) => setEditing({ ...editing, notes: event.target.value })} placeholder="Injury, pairing constraint, recent feedback…" value={editing.notes} /></label>
               <label className="check-field wide"><input checked={editing.participating} onChange={(event) => setEditing({ ...editing, participating: event.target.checked })} type="checkbox" /><span>Participating in this lineup</span></label>
             </div>
@@ -1188,13 +1229,13 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
 
       {savedOpen && (
         <div className="drawer-backdrop" onMouseDown={() => setSavedOpen(false)}>
-          <aside className="library-drawer" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="drawer-heading"><div><p className="eyebrow">This device</p><h2>Saved lineups</h2></div><button aria-label="Close saved lineups" onClick={() => setSavedOpen(false)} type="button">×</button></div>
+          <aside aria-label="Saved lineups" aria-modal="true" className="library-drawer" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+            <div className="drawer-heading"><div><p className="eyebrow">This device</p><h2>Saved lineups</h2></div><button aria-label="Close saved lineups" autoFocus onClick={() => setSavedOpen(false)} type="button">×</button></div>
             {savedLineups.length ? (
               <div className="saved-list saved-list-manage">{savedLineups.map((saved) => (
                 <article key={saved.id}>
                   <button onClick={() => loadLineup(saved)} type="button"><span><strong>{saved.name}</strong><small>{saved.boats.length} boat{saved.boats.length === 1 ? "" : "s"} · {saved.savedAt}</small></span><b>Load →</b></button>
-                  <div><button onClick={() => duplicateLineup(saved)} type="button">Duplicate</button><button onClick={() => deleteLineup(saved.id)} type="button">Delete</button></div>
+                  <div><button onClick={() => renameLineup(saved)} type="button">Rename</button><button onClick={() => duplicateLineup(saved)} type="button">Duplicate</button><button onClick={() => deleteLineup(saved.id)} type="button">Delete</button></div>
                 </article>
               ))}</div>
             ) : <div className="empty-state"><span>▱</span><h3>No saved lineups yet</h3><p>Save a generated lineup and it will appear here.</p></div>}
@@ -1207,7 +1248,7 @@ export default function BoatPlanner({ theme, onThemeChange }: BoatPlannerProps) 
           <section className="print-dialog boat-print-dialog" aria-modal="true" aria-labelledby="boat-print-title" role="dialog" onMouseDown={(event) => event.stopPropagation()}>
             <div className="print-dialog-heading"><div><p className="eyebrow">Print boat plan</p><h2 id="boat-print-title">Choose who will use this lineup</h2></div><button aria-label="Close print options" onClick={() => setPrintOpen(false)} type="button">×</button></div>
             <div className="print-meta-fields">
-              <label><span>Lineup date</span><input onChange={(event) => setPrintDate(event.target.value)} type="date" value={printDate} /></label>
+              <label><span>Lineup date</span><input autoFocus onChange={(event) => setPrintDate(event.target.value)} type="date" value={printDate} /></label>
               <label className="print-notes-field"><span>Print notes (optional)</span><input onChange={(event) => setPrintNotes(event.target.value)} placeholder="Race, crew call, lane, conditions…" value={printNotes} /></label>
             </div>
             <div className="print-choice-grid">

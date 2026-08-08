@@ -3,10 +3,23 @@
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import BoatPlanner from "./boat-planner";
 
-type Focus = "Stability" | "Connection" | "Timing" | "Power" | "Speed";
-type LegacyFocus = "Technique" | "Endurance";
+type Focus = "Stability" | "Technique" | "Endurance" | "Power" | "Speed";
+type LegacyFocus = "Connection" | "Timing";
 type Crew = "Foundational" | "Performance" | "Mixed";
 type Emphasis = "Auto" | "Stability" | "Catch" | "Timing" | "Connection" | "Exit & Recovery" | "Starts";
+type IntervalUnit = "time" | "strokes" | "distance";
+type ReviewStatus = "completed" | "modified" | "skipped";
+
+type IntervalPlan = {
+  unit: IntervalUnit;
+  work: number;
+  recoverySeconds: number;
+  repetitions: number;
+  targetRate: number;
+  targetRpe: number;
+  paceSecondsPer100m: number;
+  stopCondition: string;
+};
 
 type Drill = {
   name: string;
@@ -38,18 +51,39 @@ type SavedPlan = {
   variation?: number;
   notes: string;
   blocks?: SessionBlock[];
+  intervalPlan?: IntervalPlan;
+  sessionDate?: string;
+};
+
+type PracticeReview = {
+  id: string;
+  sessionTitle: string;
+  sessionDate: string;
+  focus: Focus;
+  status: ReviewStatus;
+  actualRpe: number;
+  conditions: string;
+  revisit: string;
+  savedAt: string;
+};
+
+type Diagnostic = {
+  issue: string;
+  drill: Drill;
+  why: string;
 };
 
 type TrainingPrintVariant = "run-sheet" | "detailed";
 type TrainingDisplay = "builder" | "timeline" | "cards" | "compact";
 export type ConsoleTheme = "dark" | "light" | "neo";
 
-const FOCUSES: Focus[] = ["Stability", "Connection", "Timing", "Power", "Speed"];
+const FOCUSES: Focus[] = ["Stability", "Technique", "Endurance", "Power", "Speed"];
 const DURATIONS = [60, 75, 90, 120];
 const CREWS: Crew[] = ["Foundational", "Performance", "Mixed"];
 const WEEKS = [12, 8, 6, 4, 3, 2, 1, 0];
 const EMPHASES: Emphasis[] = ["Auto", "Stability", "Connection", "Timing", "Catch", "Exit & Recovery", "Starts"];
 const emphasisLabel = (item: Emphasis) => item === "Starts" ? "Starts / Race" : item;
+const PHASE_POSITION: Record<Focus, number> = { Stability: 0, Technique: 1, Endurance: 2, Power: 3, Speed: 4 };
 
 const focusCopy: Record<Focus, { drill: string; main: string; cue: string }> = {
   Stability: {
@@ -57,15 +91,15 @@ const focusCopy: Record<Focus, { drill: string; main: string; cue: string }> = {
     main: "Stability under movement",
     cue: "Build a stable platform before adding force",
   },
-  Connection: {
+  Technique: {
     drill: "Catch lock + body linkage",
     main: "Connected stroke intervals",
     cue: "Connect the blade, body, and boat before adding pressure",
   },
-  Timing: {
-    drill: "Crew synchronization",
-    main: "Timing under sustained load",
-    cue: "Create one entry, one drive, and one exit",
+  Endurance: {
+    drill: "Efficient technique + crew rhythm",
+    main: "Technical endurance intervals",
+    cue: "Hold timing and length as fatigue builds",
   },
   Power: {
     drill: "Push–pull connection",
@@ -79,7 +113,7 @@ const focusCopy: Record<Focus, { drill: string; main: string; cue: string }> = {
   },
 };
 
-const drillPools: Record<Focus | Exclude<Emphasis, "Auto" | Focus>, Drill[]> = {
+const drillPools: Record<Focus | "Catch" | "Exit & Recovery" | "Starts", Drill[]> = {
   Stability: [
     {
       name: "Tall Paddling for Breathing",
@@ -106,7 +140,7 @@ const drillPools: Record<Focus | Exclude<Emphasis, "Auto" | Focus>, Drill[]> = {
       cues: ["Let it run", "Feel the glide", "Quiet recovery"],
     },
   ],
-  Connection: [
+  Technique: [
     {
       name: "Push and Pull",
       set: "Start with the blade fully buried at the front. Pull through with best technique. At the exit, keep the blade in the water and move it back to the front. Repeat slowly, then transfer the same loaded feeling into normal strokes.",
@@ -114,10 +148,10 @@ const drillPools: Record<Focus | Exclude<Emphasis, "Auto" | Focus>, Drill[]> = {
       cues: ["Feel the water", "Do not lose the load", "Blade buried before pressure"],
     },
     {
-      name: "Frankenstein",
-      set: "Paddle without bending the elbows. Move the paddle only through core rotation and the cycling of the legs and hips. Use short rounds, then return to normal paddling without losing the body-driven movement.",
-      objective: "Remove arm pulling so paddlers connect the paddle to rotation, legs, and hips.",
-      cues: ["No arms — rotate", "Show your back", "Legs and hips move the boat"],
+      name: "Find Your Entry Point",
+      set: "Place the blade fully buried at the exit and move it through the water toward the catch. Mark the natural reach point on the gunnel, then use that point during normal recovery.",
+      objective: "Find effective reach and entry without collapsing or overreaching.",
+      cues: ["Find your point"],
     },
     {
       name: "Upside Down Paddle",
@@ -132,12 +166,12 @@ const drillPools: Record<Focus | Exclude<Emphasis, "Auto" | Focus>, Drill[]> = {
       cues: ["Build the body", "Legs and hips", "Drive the boat"],
     },
   ],
-  Timing: [
+  Endurance: [
     {
-      name: "7-Up",
-      set: "The whole boat takes 1 stroke, resets at the front, and lets the boat glide. Then take 2 continuous strokes and reset. Build through 3, 4, 5, 6, and 7 strokes.",
-      objective: "Rebuild whole-boat synchronization while preserving the set-up and glide between repetitions.",
-      cues: ["Together first", "Match the front", "Reset together"],
+      name: "Pause Before the Catch",
+      set: "Hold paddles just above the water at full setup. On command, take 1 clean stroke and reset together. Build to short continuous sequences, then carry the same patience into sustained paddling.",
+      objective: "Protect front-end patience and shared timing before adding duration.",
+      cues: ["Hold the front"],
     },
     {
       name: "Part Paddling",
@@ -284,33 +318,74 @@ const drillPools: Record<Focus | Exclude<Emphasis, "Auto" | Focus>, Drill[]> = {
   ],
 };
 
-function mainSet(focus: Focus, minutes: number, crew: Crew, festivalWeeks: number) {
-  const pressure = crew === "Foundational" ? "RPE 5–6" : crew === "Mixed" ? "RPE 6–7" : "RPE 7";
-  const specificity = festivalWeeks <= 1 ? "Keep the repetitions short and exact; stop before quality fades." : festivalWeeks <= 3 ? "Use the crew's intended race rhythm, but this is not a race simulation." : "Keep the rate controlled and build capacity around the selected quality.";
-  if (focus === "Stability") {
-    return `Repeat through the block: 6 minutes at RPE 4–5 with 90 seconds easy. Use 2 minutes each for posture, controlled reach, and a quiet hull. If balance breaks, take 10 easy strokes and rebuild it. ${specificity}`;
-  }
-  if (focus === "Connection") {
-    return `Repeat through the block: 6 minutes at ${pressure} with 90 seconds easy. Every 2 minutes, use 10 strokes to confirm blade lock, body connection, and pressure transfer before returning to continuous paddling. ${specificity}`;
-  }
-  if (focus === "Timing") {
-    return `Repeat through the block: 6 minutes at ${pressure} with 90 seconds easy. Hold a controlled rate and progress from matching the catch, to matching pressure, to matching the exit and recovery. ${specificity}`;
-  }
-  if (focus === "Power") {
-    return `Repeat through the block: 45 seconds heavy pressure at 70–75% race rate, 75 seconds easy, then 10 connected power strokes. Take a full 2-minute reset after every five repetitions. ${specificity}`;
-  }
-  return `Two sets of 6 × 20 seconds at target rate with 40 seconds easy. Take 3 minutes between sets, then use remaining time for 60-second pace pieces with full technical resets. ${specificity}`;
+const DIAGNOSTICS: Diagnostic[] = [
+  { issue: "The boat feels unstable or paddlers are bracing", drill: drillPools.Stability[1], why: "Sectional work isolates where hull movement begins without asking the crew to add power." },
+  { issue: "The catch is splashy, shallow, or rushed", drill: drillPools.Catch[0], why: "Catch and Pull separates blade entry from pressure so the crew can feel a fully buried blade." },
+  { issue: "Paddlers are reaching with arms instead of rotating", drill: { name: "Rotation — Using the Body", set: "Model the setup without paddles. Hold the paddle at mid-shaft and rotate from the hips while keeping a long spine. Add a small hinge toward the water, then return to normal strokes.", objective: "Replace arm reach with controlled hip rotation and a stable body shape.", cues: ["Turn from the hips"] }, why: "The reduced movement gives paddlers a clear body-first sensation before the full stroke returns." },
+  { issue: "The blade enters at an angle or spears forward", drill: { name: "Angled Entry Correction", set: "Compare both hands at setup. Reach equally through top and bottom arms so the paddle enters nearly vertical, then take short controlled sets.", objective: "Correct negative entry angle and improve blade placement.", cues: ["Equal hands"] }, why: "Equal hand reach gives the paddle a cleaner, more vertical path into the water." },
+  { issue: "The crew is out of time", drill: drillPools.Endurance[1], why: "Part Paddling makes timing differences visible in small sections before rebuilding the whole boat." },
+  { issue: "Recovery is rushed and the boat will not glide", drill: drillPools["Exit & Recovery"][1], why: "Hang Time removes unnecessary recovery speed and lets paddlers feel when the hull runs freely." },
+  { issue: "The paddle swings away from the boat", drill: { name: "Paddle Path Correction", set: "Keep the top hand up and in front of the face. Keep the bottom-hand thumb close to the side of the boat through short controlled strokes.", objective: "Keep the paddle path compact and aligned with the hull.", cues: ["Top hand in front"] }, why: "A compact hand path reduces lateral movement and makes the recovery easier to time." },
+  { issue: "Power is coming mostly from the arms", drill: drillPools.Power[0], why: "The progressive body sequence lets paddlers compare arm effort with whole-body force transfer." },
+  { issue: "Exits are late or shovelling water", drill: drillPools["Exit & Recovery"][0], why: "The downward-and-outward exit removes the negative blade angle before it disrupts recovery timing." },
+];
+
+function defaultInterval(focus: Focus, crew: Crew): IntervalPlan {
+  const targetRate = focus === "Speed" ? 78 : focus === "Power" ? 66 : focus === "Endurance" ? 62 : 58;
+  const targetRpe = focus === "Speed" ? 8 : focus === "Power" ? 7 : focus === "Endurance" ? 6 : 5;
+  return {
+    unit: "time",
+    work: focus === "Speed" ? 30 : focus === "Power" ? 45 : 180,
+    recoverySeconds: focus === "Speed" ? 60 : focus === "Power" ? 75 : 60,
+    repetitions: focus === "Speed" ? 6 : focus === "Power" ? 6 : 4,
+    targetRate: crew === "Foundational" ? Math.max(48, targetRate - 6) : targetRate,
+    targetRpe,
+    paceSecondsPer100m: crew === "Performance" ? 52 : crew === "Mixed" ? 60 : 70,
+    stopCondition: "Stop the interval when timing, blade depth, or hull control breaks for three strokes.",
+  };
 }
 
-function resolveDrills(focus: Focus, emphasis: Emphasis, variation: number, count: number) {
-  const poolKey = emphasis === "Auto" ? focus : emphasis;
+function estimatedWorkSeconds(plan: IntervalPlan) {
+  if (plan.unit === "time") return plan.work;
+  if (plan.unit === "strokes") return plan.targetRate > 0 ? plan.work / plan.targetRate * 60 : 0;
+  return plan.work / 100 * plan.paceSecondsPer100m;
+}
+
+function intervalTotalSeconds(plan: IntervalPlan) {
+  return Math.max(0, plan.repetitions * estimatedWorkSeconds(plan) + Math.max(0, plan.repetitions - 1) * plan.recoverySeconds);
+}
+
+function intervalSet(plan: IntervalPlan, festivalWeeks: number) {
+  const workLabel = plan.unit === "time" ? `${plan.work} seconds` : plan.unit === "strokes" ? `${plan.work} strokes` : `${plan.work} m`;
+  const specificity = festivalWeeks <= 1 ? "Keep every repetition exact; stop before quality fades." : festivalWeeks <= 3 ? "Use the intended race rhythm without turning this into a full race simulation." : "Build capacity around the selected quality.";
+  return `${plan.repetitions} × ${workLabel} at ${plan.targetRate} spm and RPE ${plan.targetRpe}, with ${plan.recoverySeconds} seconds easy between repetitions. ${plan.stopCondition} ${specificity}`;
+}
+
+function mainSet(focus: Focus, crew: Crew, festivalWeeks: number, intervalPlan: IntervalPlan) {
+  const specificity = festivalWeeks <= 1 ? "Keep the repetitions short and exact; stop before quality fades." : festivalWeeks <= 3 ? "Use the crew's intended race rhythm, but this is not a race simulation." : "Keep the rate controlled and build capacity around the selected quality.";
+  if (focus === "Stability") {
+    return `${intervalSet(intervalPlan, festivalWeeks)} Between repetitions, reset posture and a quiet hull. ${specificity}`;
+  }
+  if (focus === "Technique") {
+    return `${intervalSet(intervalPlan, festivalWeeks)} Use the first 10 strokes of every repetition to confirm blade lock, body connection, and a clean exit.`;
+  }
+  if (focus === "Endurance") {
+    return `${intervalSet(intervalPlan, festivalWeeks)} The crew must keep the same catch, pressure, exit/recovery, and stroke length from the first stroke to the last.`;
+  }
+  return intervalSet(intervalPlan, festivalWeeks);
+}
+
+function resolveDrills(focus: Focus, emphasis: Emphasis, variation: number, count: number, pinnedDrill: Drill | null) {
+  const poolKey = emphasis === "Auto" ? focus : emphasis === "Connection" ? "Technique" : emphasis === "Timing" ? "Endurance" : emphasis;
   const options = drillPools[poolKey];
-  return Array.from({ length: Math.min(count, options.length) }, (_, index) => options[(variation + index) % options.length]);
+  const rotated = Array.from({ length: options.length }, (_, index) => options[(variation + index) % options.length]);
+  const choices = pinnedDrill ? [pinnedDrill, ...rotated.filter((drill) => drill.name !== pinnedDrill.name)] : rotated;
+  return choices.slice(0, Math.min(count, choices.length));
 }
 
 function normalizeFocus(focus: Focus | LegacyFocus): Focus {
-  if (focus === "Technique") return "Connection";
-  if (focus === "Endurance") return "Timing";
+  if (focus === "Connection") return "Technique";
+  if (focus === "Timing") return "Endurance";
   return focus;
 }
 
@@ -321,6 +396,8 @@ function buildSession(
   festivalWeeks: number,
   emphasis: Emphasis,
   variation: number,
+  intervalPlan: IntervalPlan,
+  pinnedDrill: Drill | null,
 ): SessionBlock[] {
   const warmUp = duration <= 60 ? 9 : duration <= 90 ? 12 : 15;
   const drillCount = duration <= 60 ? 2 : 3;
@@ -329,7 +406,7 @@ function buildSession(
   const raceNeeded = emphasis === "Starts";
   const race = raceNeeded ? (duration <= 60 ? 8 : duration <= 90 ? 12 : 16) : 0;
   const mainMinutes = duration - warmUp - drillMinutes - cooldown - race;
-  const drills = resolveDrills(focus, emphasis, variation, drillCount);
+  const drills = resolveDrills(focus, emphasis, variation, drillCount, pinnedDrill);
   const baseDrillMinutes = Math.floor(drillMinutes / drills.length);
   const extraDrillMinutes = drillMinutes % drills.length;
   const easy = Math.max(3, Math.round(warmUp * 0.35));
@@ -346,7 +423,7 @@ function buildSession(
       icon: "↗",
       objective: "Raise body temperature, settle the hull, and establish one relaxed crew rhythm.",
       set: `${activation} min mobility and posture reset; ${easy} min easy continuous paddle; ${boatFeel} min alternating 10 build strokes with 20 easy strokes.`,
-      cues: ["Tall posture", "Loose hands", "Boat moves before rate rises"],
+      cues: ["Tall posture"],
     },
   ];
 
@@ -359,7 +436,7 @@ function buildSession(
       icon: "◒",
       objective: drill.objective,
       set: drill.set,
-      cues: drill.cues,
+      cues: drill.cues.slice(0, 1),
     });
   });
 
@@ -369,9 +446,9 @@ function buildSession(
       detail: `${crewPrefix} ${focusCopy[focus].main.toLowerCase()}`,
       minutes: mainMinutes,
       icon: "⌁",
-      objective: focus === "Stability" ? "Maintain balance and posture while the boat is moving." : focus === "Connection" ? "Transfer pressure cleanly from the paddler through the planted blade into the boat." : focus === "Timing" ? "Hold one crew rhythm as effort and duration increase." : focus === "Power" ? "Increase force per stroke while protecting connection and crew timing." : "Reach race rate without trading away connection, timing, or clean exits.",
-      set: mainSet(focus, mainMinutes, crew, festivalWeeks),
-      cues: [focusCopy[focus].cue, crew === "Foundational" ? "Quality decides the intensity" : "Reset immediately when timing slips", "One boat, one surge"],
+      objective: focus === "Stability" ? "Maintain balance and posture while the boat is moving." : focus === "Technique" ? "Transfer pressure cleanly through a repeatable stroke sequence." : focus === "Endurance" ? "Hold efficient technique and one crew rhythm as duration increases." : focus === "Power" ? "Increase force per stroke while protecting connection and crew timing." : "Reach race rate without trading away connection, timing, or clean exits.",
+      set: mainSet(focus, crew, festivalWeeks, intervalPlan),
+      cues: [focusCopy[focus].cue],
     });
 
   if (raceNeeded) {
@@ -383,7 +460,7 @@ function buildSession(
       icon: "⚑",
       objective: "Rehearse the calls and transitions the crew must execute automatically on race day.",
       set: duration >= 90 ? "Join the three start phases into 3 complete starts using 5–5–5–10–3. If festival week is selected, finish with up to 2 × 200 m controlled race executions with full recovery; otherwise stop after the start work." : "Join the three start phases into 3 complete starts using 5–5–5–10–3. Add one 200 m execution only if the crew needs it and technique remains clean.",
-      cues: ["First five: place and load", "Transition together", "Finish with length before rate"],
+      cues: ["First five: place and load"],
     });
   }
 
@@ -395,7 +472,7 @@ function buildSession(
     icon: "⌄",
     objective: "Lower effort gradually and leave the crew with the session's best technical feeling.",
     set: `${Math.max(4, cooldown - 2)} min easy continuous paddle, then 2 min shoulder, hip, and thoracic mobility at the dock.`,
-    cues: ["Long and quiet", "Breathe down", "Name one cue to carry forward"],
+    cues: ["Long and quiet"],
   });
 
   return blocks;
@@ -450,6 +527,17 @@ export default function Home() {
   const [theme, setTheme] = useState<ConsoleTheme>("light");
   const [loadedBlocks, setLoadedBlocks] = useState<SessionBlock[] | null>(null);
   const [loadedPlanTitle, setLoadedPlanTitle] = useState("");
+  const [sessionTitle, setSessionTitle] = useState("Stability Practice");
+  const [sessionDate, setSessionDate] = useState(new Date().toISOString().slice(0, 10));
+  const [intervalPlan, setIntervalPlan] = useState<IntervalPlan>(() => defaultInterval("Stability", "Performance"));
+  const [diagnosticKey, setDiagnosticKey] = useState("");
+  const [pinnedDrill, setPinnedDrill] = useState<Drill | null>(null);
+  const [reviews, setReviews] = useState<PracticeReview[]>([]);
+  const [reviewStatus, setReviewStatus] = useState<ReviewStatus>("completed");
+  const [actualRpe, setActualRpe] = useState(6);
+  const [reviewConditions, setReviewConditions] = useState("");
+  const [revisit, setRevisit] = useState("");
+  const [trainingHydrated, setTrainingHydrated] = useState(false);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("kdbc-console-theme");
@@ -458,12 +546,84 @@ export default function Home() {
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
+  useEffect(() => {
+    const closeOverlays = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setLibraryOpen(false);
+      setPrintOpen(false);
+    };
+    window.addEventListener("keydown", closeOverlays);
+    return () => window.removeEventListener("keydown", closeOverlays);
+  }, []);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        const draft = JSON.parse(window.localStorage.getItem("kdbc-active-session-v2") ?? "null") as (SavedPlan & { title?: string }) | null;
+        if (draft) {
+          const normalizedFocus = normalizeFocus(draft.focus);
+          setFocus(normalizedFocus);
+          setDuration(draft.duration);
+          setCrew(draft.crew);
+          setFestivalWeeks(draft.festivalWeeks);
+          setEmphasis(draft.emphasis);
+          setVariation(draft.variation ?? 0);
+          setNotes(draft.notes ?? "");
+          setIntervalPlan(draft.intervalPlan ?? defaultInterval(normalizedFocus, draft.crew));
+          setSessionTitle(draft.title || `${normalizedFocus} Practice`);
+          setSessionDate(draft.sessionDate || new Date().toISOString().slice(0, 10));
+          if (draft.blocks?.length) {
+            setLoadedBlocks(draft.blocks);
+            setLoadedPlanTitle(draft.title || `${normalizedFocus} Practice`);
+          }
+        }
+        setReviews(JSON.parse(window.localStorage.getItem("kdbc-practice-reviews-v1") ?? "[]") as PracticeReview[]);
+        window.localStorage.setItem("kdbc-data-schema-version", "2");
+      } catch {
+        window.localStorage.removeItem("kdbc-active-session-v2");
+      }
+      setTrainingHydrated(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
   const generatedSession = useMemo(
-    () => buildSession(focus, duration, crew, festivalWeeks, emphasis, variation),
-    [focus, duration, crew, festivalWeeks, emphasis, variation],
+    () => buildSession(focus, duration, crew, festivalWeeks, emphasis, variation, intervalPlan, pinnedDrill),
+    [focus, duration, crew, festivalWeeks, emphasis, variation, intervalPlan, pinnedDrill],
   );
   const session = loadedBlocks ?? generatedSession;
   const total = session.reduce((sum, block) => sum + block.minutes, 0);
+  const mainMinutes = session.find((block) => block.id === "main")?.minutes ?? 0;
+  const intervalMinutes = intervalTotalSeconds(intervalPlan) / 60;
+  const selectedDiagnostic = DIAGNOSTICS.find((item) => item.issue === diagnosticKey) ?? null;
+  const nextPractice = useMemo(() => {
+    if (!reviews.length) return `Begin with ${focus} and record the post-practice result.`;
+    const latest = reviews[0];
+    if (latest.status !== "completed" || latest.revisit.trim()) return `Repeat ${latest.focus} and address: ${latest.revisit || "the modified session conditions"}.`;
+    const completedSamePhase = reviews.filter((item) => item.focus === latest.focus && item.status === "completed" && !item.revisit.trim()).slice(0, 2).length;
+    if (completedSamePhase < 2) return `Repeat ${latest.focus} once more to confirm the quality is stable.`;
+    const next = FOCUSES[Math.min(PHASE_POSITION[latest.focus] + 1, FOCUSES.length - 1)];
+    return next === latest.focus ? "Maintain Speed while rotating technical emphasis." : `Progress to ${next}; continue timing as a standard throughout the session.`;
+  }, [focus, reviews]);
+
+  useEffect(() => {
+    if (!trainingHydrated) return;
+    window.localStorage.setItem("kdbc-active-session-v2", JSON.stringify({
+      id: "active-session",
+      title: sessionTitle,
+      savedAt: new Date().toISOString(),
+      sessionDate,
+      focus,
+      duration,
+      crew,
+      festivalWeeks,
+      emphasis,
+      variation,
+      notes,
+      blocks: session,
+      intervalPlan,
+    } satisfies SavedPlan));
+  }, [crew, duration, emphasis, festivalWeeks, focus, intervalPlan, notes, session, sessionDate, sessionTitle, trainingHydrated, variation]);
 
   function clearLoadedPractice() {
     setLoadedBlocks(null);
@@ -473,6 +633,9 @@ export default function Home() {
   function updateFocus(next: Focus) {
     clearLoadedPractice();
     setFocus(next);
+    setSessionTitle(`${next} Practice`);
+    setIntervalPlan(defaultInterval(next, crew));
+    setPinnedDrill(null);
   }
 
   function updateDuration(next: number) {
@@ -483,6 +646,7 @@ export default function Home() {
   function updateCrew(next: Crew) {
     clearLoadedPractice();
     setCrew(next);
+    setIntervalPlan(defaultInterval(focus, next));
   }
 
   function updateFestivalWeeks(next: number) {
@@ -493,6 +657,11 @@ export default function Home() {
   function updateEmphasis(next: Emphasis) {
     clearLoadedPractice();
     setEmphasis(next);
+  }
+
+  function updateInterval(patch: Partial<IntervalPlan>) {
+    clearLoadedPractice();
+    setIntervalPlan((current) => ({ ...current, ...patch }));
   }
 
   function showNotice(message: string) {
@@ -516,7 +685,7 @@ export default function Home() {
     const saved = JSON.parse(window.localStorage.getItem("dragonboat-plans") ?? "[]") as SavedPlan[];
     const plan: SavedPlan = {
       id: String(Date.now()),
-      title: loadedPlanTitle || `${focus} Practice`,
+      title: sessionTitle,
       savedAt: new Date().toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" }),
       focus,
       duration,
@@ -526,6 +695,8 @@ export default function Home() {
       variation,
       notes,
       blocks: session,
+      intervalPlan,
+      sessionDate,
     };
     const next = [plan, ...saved].slice(0, 12);
     window.localStorage.setItem("dragonboat-plans", JSON.stringify(next));
@@ -543,8 +714,58 @@ export default function Home() {
     setVariation(plan.variation ?? 0);
     setLoadedBlocks(plan.blocks ?? null);
     setLoadedPlanTitle(plan.title || `${normalizeFocus(plan.focus)} Practice`);
+    setSessionTitle(plan.title || `${normalizeFocus(plan.focus)} Practice`);
+    setSessionDate(plan.sessionDate || new Date().toISOString().slice(0, 10));
+    setIntervalPlan(plan.intervalPlan ?? defaultInterval(normalizeFocus(plan.focus), plan.crew));
     setLibraryOpen(false);
     showNotice("Saved practice loaded");
+  }
+
+  function storePlans(next: SavedPlan[]) {
+    window.localStorage.setItem("dragonboat-plans", JSON.stringify(next));
+    setSavedPlans(next);
+  }
+
+  function renamePlan(plan: SavedPlan) {
+    const title = window.prompt("Rename saved practice", plan.title || `${normalizeFocus(plan.focus)} Practice`)?.trim();
+    if (!title) return;
+    storePlans(savedPlans.map((item) => item.id === plan.id ? { ...item, title } : item));
+  }
+
+  function duplicatePlan(plan: SavedPlan) {
+    const copy = { ...structuredClone(plan), id: String(Date.now()), title: `${plan.title || `${normalizeFocus(plan.focus)} Practice`} copy`, savedAt: new Date().toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" }) };
+    storePlans([copy, ...savedPlans].slice(0, 20));
+  }
+
+  function deletePlan(id: string) {
+    storePlans(savedPlans.filter((plan) => plan.id !== id));
+  }
+
+  function applyDiagnostic() {
+    if (!selectedDiagnostic) return;
+    clearLoadedPractice();
+    setPinnedDrill(selectedDiagnostic.drill);
+    showNotice(`${selectedDiagnostic.drill.name} added to this practice`);
+  }
+
+  function saveReview() {
+    const review: PracticeReview = {
+      id: String(Date.now()),
+      sessionTitle,
+      sessionDate,
+      focus,
+      status: reviewStatus,
+      actualRpe,
+      conditions: reviewConditions.trim(),
+      revisit: revisit.trim(),
+      savedAt: new Date().toISOString(),
+    };
+    const next = [review, ...reviews].slice(0, 50);
+    setReviews(next);
+    window.localStorage.setItem("kdbc-practice-reviews-v1", JSON.stringify(next));
+    setReviewConditions("");
+    setRevisit("");
+    showNotice("Post-practice review saved");
   }
 
   async function copyPlan() {
@@ -566,8 +787,8 @@ export default function Home() {
   }
 
   function openPrintOptions() {
-    setPrintTitle(`${focus} Practice`);
-    setPrintDate(new Date().toISOString().slice(0, 10));
+    setPrintTitle(sessionTitle);
+    setPrintDate(sessionDate);
     setPrintOpen(true);
   }
 
@@ -586,7 +807,7 @@ export default function Home() {
     const keys = Object.keys(window.localStorage).filter((key) => key.startsWith("kdbc-") || key.startsWith("dragonboat-")).sort();
     const data = Object.fromEntries(keys.map((key) => [key, window.localStorage.getItem(key)]));
     downloadJson(`kdbc-coach-tools-backup-${new Date().toISOString().slice(0, 10)}.json`, {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       data,
     });
@@ -639,7 +860,7 @@ export default function Home() {
         <div className="coach-avatar" title="Coach Nico" aria-label="Coach Nico">NS</div>
       </header>
 
-      {module === "boats" ? <BoatPlanner onThemeChange={changeTheme} theme={theme} /> : <>
+      {module === "boats" ? <BoatPlanner onThemeChange={changeTheme} sessionDate={sessionDate} sessionTitle={sessionTitle} theme={theme} /> : <>
 
       <section className="display-switcher-wrap" aria-label="Training console display">
         <div className="display-switcher-copy"><span>Display</span><strong>Training console</strong></div>
@@ -650,7 +871,7 @@ export default function Home() {
             ["cards", "Coach cards", "Detailed blocks"],
             ["compact", "Compact", "Tablet / dock"],
           ] as [TrainingDisplay, string, string][]).map(([value, label, description]) => (
-            <button className={trainingDisplay === value ? "active" : ""} key={value} onClick={() => setTrainingDisplay(value)} type="button"><strong>{label}</strong><small>{description}</small></button>
+            <button aria-pressed={trainingDisplay === value} className={trainingDisplay === value ? "active" : ""} key={value} onClick={() => setTrainingDisplay(value)} type="button"><strong>{label}</strong><small>{description}</small></button>
           ))}
         </div>
         <ThemePicker onChange={changeTheme} theme={theme} />
@@ -661,8 +882,18 @@ export default function Home() {
           <div className="intro">
             <p className="eyebrow">Practice design console</p>
             <h1>Build today&apos;s practice</h1>
-            <p>Set the context. Get a coherent session built for your crew in seconds.</p>
+            <p>Plan the session, coach one cue at a time, and record what the crew actually completed.</p>
           </div>
+
+          <div className="session-identity">
+            <label><span>Session name</span><input onChange={(event) => setSessionTitle(event.target.value)} value={sessionTitle} /></label>
+            <label><span>Practice date</span><input onChange={(event) => setSessionDate(event.target.value)} type="date" value={sessionDate} /></label>
+          </div>
+
+          <div className="phase-ladder" aria-label="Season training progression">
+            {FOCUSES.map((item, index) => <button aria-current={focus === item ? "step" : undefined} className={focus === item ? "active" : PHASE_POSITION[item] < PHASE_POSITION[focus] ? "complete" : ""} key={item} onClick={() => updateFocus(item)} type="button"><span>{index + 1}</span><strong>{item}</strong></button>)}
+          </div>
+          <p className="timing-standard">Timing is coached in every phase; it is a quality standard, not a separate progression phase.</p>
 
           <div className="quick-controls">
             <label className="control-card">
@@ -696,7 +927,7 @@ export default function Home() {
               <div><h2>Festival proximity</h2><strong>{festivalWeeks === 0 ? "Race day" : `${festivalWeeks} week${festivalWeeks === 1 ? "" : "s"}`}</strong></div>
               <span aria-hidden="true">▦</span>
             </div>
-            <input aria-label="Weeks until festival" max={WEEKS.length - 1} min="0" onChange={(event) => updateFestivalWeeks(WEEKS[Number(event.target.value)])} type="range" value={WEEKS.indexOf(festivalWeeks)} />
+            <input aria-label="Weeks until festival" aria-valuetext={festivalWeeks === 0 ? "Race day" : `${festivalWeeks} weeks until festival`} max={WEEKS.length - 1} min="0" onChange={(event) => updateFestivalWeeks(WEEKS[Number(event.target.value)])} type="range" value={WEEKS.indexOf(festivalWeeks)} />
             <div className="range-labels" aria-hidden="true">
               {WEEKS.map((week) => <span className={festivalWeeks === week ? "selected" : ""} key={week}>{week === 0 ? "Race day" : `${week}w`}</span>)}
             </div>
@@ -709,6 +940,21 @@ export default function Home() {
               <p>{festivalWeeks <= 3 ? `Keep the ${focus.toLowerCase()} work specific and exact. Race execution is added only when “Starts / Race” is selected below.` : `Build ${focus.toLowerCase()} quality and capacity. Race execution stays out unless you deliberately select it.`}</p>
             </div>
           </aside>
+
+          <section className="interval-builder" aria-labelledby="interval-title">
+            <div className="section-heading"><div><p className="eyebrow">Main-set prescription</p><h2 id="interval-title">Editable intervals</h2></div><span className={intervalMinutes <= mainMinutes ? "fit-badge fits" : "fit-badge over"}>{intervalMinutes.toFixed(1)} / {mainMinutes} min</span></div>
+            <div className="interval-grid">
+              <label><span>Measure</span><select value={intervalPlan.unit} onChange={(event) => updateInterval({ unit: event.target.value as IntervalUnit })}><option value="time">Time (seconds)</option><option value="strokes">Stroke count</option><option value="distance">Distance (m)</option></select></label>
+              <label><span>{intervalPlan.unit === "time" ? "Work seconds" : intervalPlan.unit === "strokes" ? "Strokes" : "Distance (m)"}</span><input min="1" onChange={(event) => updateInterval({ work: Math.max(1, Number(event.target.value)) })} type="number" value={intervalPlan.work} /></label>
+              <label><span>Repetitions</span><input min="1" max="30" onChange={(event) => updateInterval({ repetitions: Math.max(1, Number(event.target.value)) })} type="number" value={intervalPlan.repetitions} /></label>
+              <label><span>Recovery (sec)</span><input min="0" step="5" onChange={(event) => updateInterval({ recoverySeconds: Math.max(0, Number(event.target.value)) })} type="number" value={intervalPlan.recoverySeconds} /></label>
+              <label><span>Target rate (spm)</span><input min="35" max="120" onChange={(event) => updateInterval({ targetRate: Math.max(1, Number(event.target.value)) })} type="number" value={intervalPlan.targetRate} /></label>
+              <label><span>Target RPE</span><input min="1" max="10" onChange={(event) => updateInterval({ targetRpe: Math.max(1, Math.min(10, Number(event.target.value))) })} type="number" value={intervalPlan.targetRpe} /></label>
+              {intervalPlan.unit === "distance" && <label><span>Planning pace / 100 m</span><input min="20" onChange={(event) => updateInterval({ paceSecondsPer100m: Math.max(1, Number(event.target.value)) })} type="number" value={intervalPlan.paceSecondsPer100m} /></label>}
+            </div>
+            <label className="stop-condition"><span>Technical stop condition</span><input onChange={(event) => updateInterval({ stopCondition: event.target.value })} value={intervalPlan.stopCondition} /></label>
+            <p className={intervalMinutes <= mainMinutes ? "fit-note" : "fit-note warning"}>{intervalMinutes <= mainMinutes ? `${(mainMinutes - intervalMinutes).toFixed(1)} minutes remain for setup, feedback, and resets.` : `Shorten the work, recovery, or repetitions by ${(intervalMinutes - mainMinutes).toFixed(1)} minutes to fit the main-set block.`}{intervalPlan.unit === "distance" ? " Distance timing is an estimate using the planning pace shown above." : ""}</p>
+          </section>
 
           <div className="coach-rule"><span>Coach&apos;s rule</span><p>{focusCopy[focus].cue}.</p></div>
           <button className="build-button" onClick={generateSession} type="button"><PaddleMark />Build complete practice</button>
@@ -745,6 +991,17 @@ export default function Home() {
           </div>
         </div>
 
+        <div className="coaching-intelligence-grid">
+          <section className="diagnostic-panel">
+            <div><p className="eyebrow">What are you seeing?</p><h3>Diagnostic drill selector</h3><p>Choose the largest boat-wide limiter. The tool recommends one drill and one cue.</p></div>
+            <label><span>Observed issue</span><select onChange={(event) => setDiagnosticKey(event.target.value)} value={diagnosticKey}><option value="">Choose an observed issue…</option>{DIAGNOSTICS.map((item) => <option key={item.issue}>{item.issue}</option>)}</select></label>
+            {selectedDiagnostic && <div className="diagnostic-result"><span>Recommended drill</span><strong>{selectedDiagnostic.drill.name}</strong><p>{selectedDiagnostic.why}</p><b>Primary cue: {selectedDiagnostic.drill.cues[0]}</b><button onClick={applyDiagnostic} type="button">Use this drill in the plan</button></div>}
+          </section>
+          <section className="next-practice-panel">
+            <p className="eyebrow">Recent history</p><h3>Next-practice guidance</h3><p>{nextPractice}</p><small>Progression only advances after two completed sessions without an unresolved issue.</small>
+          </section>
+        </div>
+
         <div className="plan-layout">
           <div className="detailed-blocks">
             {session.map((block, index) => (
@@ -756,7 +1013,7 @@ export default function Home() {
                     <div><h4>Purpose</h4><p>{block.objective}</p></div>
                     <div><h4>Set</h4><p>{block.set}</p></div>
                   </div>
-                  <div className="cue-list"><strong>Coach cues</strong>{block.cues.map((cue) => <span key={cue}>{cue}</span>)}</div>
+                  <div className="cue-list"><strong>Primary coach cue</strong>{block.cues.slice(0, 1).map((cue) => <span key={cue}>{cue}</span>)}</div>
                 </div>
               </article>
             ))}
@@ -777,12 +1034,23 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="practice-review" aria-labelledby="practice-review-title">
+        <div className="review-heading"><div><p className="eyebrow">Close the loop</p><h2 id="practice-review-title">60-second post-practice review</h2><p>Record what happened so the next practice reflects evidence, not memory.</p></div><span>{reviews.length} saved</span></div>
+        <div className="review-grid">
+          <label><span>Outcome</span><select onChange={(event) => setReviewStatus(event.target.value as ReviewStatus)} value={reviewStatus}><option value="completed">Completed as planned</option><option value="modified">Modified</option><option value="skipped">Skipped</option></select></label>
+          <label><span>Actual RPE</span><input min="1" max="10" onChange={(event) => setActualRpe(Number(event.target.value))} type="number" value={actualRpe} /></label>
+          <label><span>Conditions / changes</span><input onChange={(event) => setReviewConditions(event.target.value)} placeholder="Wind, attendance, shortened set…" value={reviewConditions} /></label>
+          <label><span>Issue to revisit</span><input onChange={(event) => setRevisit(event.target.value)} placeholder="Leave blank if the quality held" value={revisit} /></label>
+        </div>
+        <button className="review-save" onClick={saveReview} type="button">Save practice review</button>
+      </section>
+
       {libraryOpen && (
         <div className="drawer-backdrop" onMouseDown={() => setLibraryOpen(false)}>
-          <aside className="library-drawer" aria-label="Saved practices" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="drawer-heading"><div><p className="eyebrow">This device</p><h2>Saved practices</h2></div><button aria-label="Close saved practices" onClick={() => setLibraryOpen(false)} type="button">×</button></div>
+          <aside aria-modal="true" className="library-drawer" aria-label="Saved practices" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+            <div className="drawer-heading"><div><p className="eyebrow">This device</p><h2>Saved practices</h2></div><button aria-label="Close saved practices" autoFocus onClick={() => setLibraryOpen(false)} type="button">×</button></div>
             {savedPlans.length === 0 ? <div className="empty-state"><span>▱</span><h3>No saved practices yet</h3><p>Save a session and it will appear here for quick reuse.</p></div> : (
-              <div className="saved-list">{savedPlans.map((plan) => <button key={plan.id} onClick={() => loadPlan(plan)} type="button"><span><strong>{plan.title || `${normalizeFocus(plan.focus)} · ${plan.duration} min`}</strong><small>{plan.crew} crew · {plan.duration} min · {plan.savedAt}</small></span><b>Load →</b></button>)}</div>
+              <div className="saved-list saved-list-manage">{savedPlans.map((plan) => <article key={plan.id}><button onClick={() => loadPlan(plan)} type="button"><span><strong>{plan.title || `${normalizeFocus(plan.focus)} · ${plan.duration} min`}</strong><small>{plan.crew} crew · {plan.duration} min · {plan.savedAt}</small></span><b>Load →</b></button><div><button onClick={() => renamePlan(plan)} type="button">Rename</button><button onClick={() => duplicatePlan(plan)} type="button">Duplicate</button><button onClick={() => deletePlan(plan.id)} type="button">Delete</button></div></article>)}</div>
             )}
           </aside>
         </div>
@@ -794,7 +1062,7 @@ export default function Home() {
           <section className="print-dialog" aria-modal="true" aria-labelledby="training-print-title" role="dialog" onMouseDown={(event) => event.stopPropagation()}>
             <div className="print-dialog-heading"><div><p className="eyebrow">Print training plan</p><h2 id="training-print-title">Choose your coaching format</h2></div><button aria-label="Close print options" onClick={() => setPrintOpen(false)} type="button">×</button></div>
             <div className="print-meta-fields">
-              <label><span>Plan title</span><input onChange={(event) => setPrintTitle(event.target.value)} value={printTitle} /></label>
+              <label><span>Plan title</span><input autoFocus onChange={(event) => setPrintTitle(event.target.value)} value={printTitle} /></label>
               <label><span>Practice date</span><input onChange={(event) => setPrintDate(event.target.value)} type="date" value={printDate} /></label>
             </div>
             <div className="print-choice-grid">
@@ -819,7 +1087,7 @@ export default function Home() {
               <div className="print-session-strip"><span><b>Focus</b>{focus}</span><span><b>Emphasis</b>{emphasisLabel(emphasis)}</span><span><b>Festival</b>{festivalWeeks === 0 ? "Race day" : `${festivalWeeks} weeks`}</span><span><b>Total</b>{total} min</span></div>
               <div className="run-sheet-table">
                 <div className="run-sheet-head"><span>Time</span><span>Block & execution</span><span>Coach cues</span></div>
-                {session.map((block, index) => <div className="run-sheet-row" key={block.id}><span><b>{String(index + 1).padStart(2, "0")}</b><strong>{block.minutes} min</strong></span><span><b>{block.name}</b><small>{block.set}</small></span><span>{block.cues.map((cue) => <i key={cue}>{cue}</i>)}</span></div>)}
+                {session.map((block, index) => <div className="run-sheet-row" key={block.id}><span><b>{String(index + 1).padStart(2, "0")}</b><strong>{block.minutes} min</strong></span><span><b>{block.name}</b><small>{block.set}</small></span><span>{block.cues.slice(0, 1).map((cue) => <i key={cue}>{cue}</i>)}</span></div>)}
               </div>
               <div className="print-coach-rule"><b>Coach&apos;s rule</b><span>{focusCopy[focus].cue}. Reset the set when the selected quality is lost.</span></div>
               <div className="print-notes-box"><b>On-water notes</b><p>{notes || ""}</p><span /><span /><span /></div>
@@ -829,7 +1097,7 @@ export default function Home() {
               <div className="print-title-row"><div><p>{crew} crew · {duration} minutes</p><h1>{printTitle || `${focus} Practice`}</h1></div><div><span>Practice date</span><strong>{printDate || "Not set"}</strong></div></div>
               <div className="print-session-strip"><span><b>Focus</b>{focus}</span><span><b>Emphasis</b>{emphasisLabel(emphasis)}</span><span><b>Festival</b>{festivalWeeks === 0 ? "Race day" : `${festivalWeeks} weeks`}</span><span><b>Total</b>{total} min</span></div>
               <section className="detailed-print-blocks">
-                {session.map((block, index) => <article className="detailed-print-card" key={block.id}><div className="detailed-print-number">{String(index + 1).padStart(2, "0")}</div><div><header><span>{block.minutes} minutes</span><h2>{block.name}</h2><p>{block.detail}</p></header><div className="detailed-print-grid"><section><b>Purpose</b><p>{block.objective}</p></section><section><b>Set</b><p>{block.set}</p></section></div><div className="detailed-print-cues"><b>Coach cues</b>{block.cues.map((cue) => <span key={cue}>{cue}</span>)}</div></div></article>)}
+                {session.map((block, index) => <article className="detailed-print-card" key={block.id}><div className="detailed-print-number">{String(index + 1).padStart(2, "0")}</div><div><header><span>{block.minutes} minutes</span><h2>{block.name}</h2><p>{block.detail}</p></header><div className="detailed-print-grid"><section><b>Purpose</b><p>{block.objective}</p></section><section><b>Set</b><p>{block.set}</p></section></div><div className="detailed-print-cues"><b>Primary coach cue</b>{block.cues.slice(0, 1).map((cue) => <span key={cue}>{cue}</span>)}</div></div></article>)}
               </section>
               <div className="print-notes-box detailed-notes"><b>Coach&apos;s notes</b><p>{notes || ""}</p><span /><span /><span /></div>
             </article>
