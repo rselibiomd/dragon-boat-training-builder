@@ -6,8 +6,21 @@ const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8")
 const boats = await readFile(new URL("../app/boat-planner.tsx", import.meta.url), "utf8");
 
 test("Release 1 trust controls remain present", () => {
-  for (const pattern of [/blocks: session/, /kdbc-active-session-v2/, /Export data/, /Restore/, /clearPrivateData/, /renamePlan/, /duplicatePlan/, /deletePlan/]) assert.match(page, pattern);
-  for (const pattern of [/kdbc-boat-draft-v1/, /rebuildNeeded/, /undoBoatEdit/, /redoBoatEdit/, /renameLineup/, /duplicateLineup/, /deleteLineup/]) assert.match(boats, pattern);
+  assert.match(page, /blocks: session/);
+  assert.match(page, /kdbc-active-session-v2/);
+  assert.match(page, /Export data/);
+  assert.match(page, /Restore/);
+  assert.match(page, /clearPrivateData/);
+  assert.match(page, /renamePlan/);
+  assert.match(page, /duplicatePlan/);
+  assert.match(page, /deletePlan/);
+  assert.match(boats, /DRAFT_KEY = "kdbc-boat-draft-v1"/);
+  assert.match(boats, /rebuildNeeded/);
+  assert.match(boats, /undoBoatEdit/);
+  assert.match(boats, /redoBoatEdit/);
+  assert.match(boats, /renameLineup/);
+  assert.match(boats, /duplicateLineup/);
+  assert.match(boats, /deleteLineup/);
 });
 
 test("Release 2 uses the corrected progression and active drill governance", () => {
@@ -15,9 +28,42 @@ test("Release 2 uses the corrected progression and active drill governance", () 
   assert.match(page, /Timing is coached in every phase/);
   assert.doesNotMatch(page, /Frankenstein/);
   assert.doesNotMatch(page, /7-Up/);
-  for (const pattern of [/Pause Before the Catch/, /Diagnostic drill selector/, /intervalTotalSeconds/, /Technical stop condition/, /post-practice review/i]) assert.match(page, pattern);
+  assert.match(page, /Pause Before the Catch/);
+  assert.match(page, /Diagnostic drill selector/);
+  assert.match(page, /intervalTotalSeconds/);
+  assert.match(page, /Technical stop condition/);
+  assert.match(page, /post-practice review/i);
 });
 
 test("ratings include anchors, evidence date, and confidence", () => {
-  for (const pattern of [/RATING_ANCHORS/, /ratingAssessedAt/, /ratingConfidence/, /Assessment date/, /Evidence confidence/]) assert.match(boats, pattern);
+  assert.match(boats, /RATING_ANCHORS/);
+  assert.match(boats, /ratingAssessedAt/);
+  assert.match(boats, /ratingConfidence/);
+  assert.match(boats, /Assessment date/);
+  assert.match(boats, /Evidence confidence/);
+});
+
+test("Release 3 keeps hard constraints separate from optimization", () => {
+  assert.match(boats, /sessionRole/);
+  assert.match(boats, /eventEligibility/);
+  assert.match(boats, /mustPairWith/);
+  assert.match(boats, /avoidPairWith/);
+  assert.match(boats, /rowRestriction/);
+  assert.match(boats, /steerId/);
+  assert.match(boats, /drummerId/);
+  assert.match(boats, /Why this seat/);
+  assert.match(boats, /recommendation quality/);
+  assert.match(boats, /data confidence/);
+  assert.match(boats, /Dockside change/);
+  assert.match(boats, /current paddler profiles/i);
+});
+
+test("Release 1/2 hardening uses unified sessions and validated backups", () => {
+  assert.match(page, /sessionId/);
+  assert.match(page, /Encrypted backup/);
+  assert.match(page, /validateBackupData/);
+  assert.match(page, /editReview/);
+  assert.match(page, /deleteReview/);
+  assert.match(page, /consecutive sessions/);
+  assert.match(page, /drillEffectiveness/);
 });

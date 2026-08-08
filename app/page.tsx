@@ -1,7 +1,8 @@
 "use client";
 
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import BoatPlanner from "./boat-planner";
+import { DATA_SCHEMA_VERSION, migrateLegacySession, newSessionId, updateSession, validateBackupData } from "./session-store";
 
 type Focus = "Stability" | "Technique" | "Endurance" | "Power" | "Speed";
 type LegacyFocus = "Connection" | "Timing";
@@ -26,6 +27,7 @@ type Drill = {
   set: string;
   objective: string;
   cues: string[];
+  status?: "active" | "limited";
 };
 
 type SessionBlock = {
@@ -41,6 +43,7 @@ type SessionBlock = {
 
 type SavedPlan = {
   id: string;
+  sessionId?: string;
   title?: string;
   savedAt: string;
   focus: Focus | LegacyFocus;
@@ -57,6 +60,7 @@ type SavedPlan = {
 
 type PracticeReview = {
   id: string;
+  sessionId: string;
   sessionTitle: string;
   sessionDate: string;
   focus: Focus;
@@ -64,6 +68,8 @@ type PracticeReview = {
   actualRpe: number;
   conditions: string;
   revisit: string;
+  drillUsed: string;
+  drillEffectiveness: number | null;
   savedAt: string;
 };
 
@@ -129,6 +135,7 @@ const drillPools: Record<Focus | "Catch" | "Exit & Recovery" | "Starts", Drill[]
     },
     {
       name: "Paddling Blind",
+      status: "limited",
       set: "Take 10 strokes to establish boat speed. On the call, paddlers close their eyes and feel the hull and crew rhythm. Begin slower than normal; repeat only as control improves.",
       objective: "Improve balance and boat feel by reducing reliance on visual timing.",
       cues: ["Feel the boat", "Trust the rhythm", "Stay centred"],
@@ -155,6 +162,7 @@ const drillPools: Record<Focus | "Catch" | "Exit & Recovery" | "Starts", Drill[]
     },
     {
       name: "Upside Down Paddle",
+      status: "limited",
       set: "Turn paddles upside down and move through the stroke slowly. Search for resistance instead of pushing through. Turn paddles back and reproduce the same heavy-water feeling with a fully buried blade.",
       objective: "Heighten awareness of heavy water, blade loading, and pressure transfer.",
       cues: ["Find heavy water", "Load before drive", "Do not slip"],
@@ -361,10 +369,9 @@ function intervalSet(plan: IntervalPlan, festivalWeeks: number) {
   return `${plan.repetitions} × ${workLabel} at ${plan.targetRate} spm and RPE ${plan.targetRpe}, with ${plan.recoverySeconds} seconds easy between repetitions. ${plan.stopCondition} ${specificity}`;
 }
 
-function mainSet(focus: Focus, crew: Crew, festivalWeeks: number, intervalPlan: IntervalPlan) {
-  const specificity = festivalWeeks <= 1 ? "Keep the repetitions short and exact; stop before quality fades." : festivalWeeks <= 3 ? "Use the crew's intended race rhythm, but this is not a race simulation." : "Keep the rate controlled and build capacity around the selected quality.";
+function mainSet(focus: Focus, festivalWeeks: number, intervalPlan: IntervalPlan) {
   if (focus === "Stability") {
-    return `${intervalSet(intervalPlan, festivalWeeks)} Between repetitions, reset posture and a quiet hull. ${specificity}`;
+    return `${intervalSet(intervalPlan, festivalWeeks)} Between repetitions, reset posture and a quiet hull.`;
   }
   if (focus === "Technique") {
     return `${intervalSet(intervalPlan, festivalWeeks)} Use the first 10 strokes of every repetition to confirm blade lock, body connection, and a clean exit.`;
@@ -447,7 +454,7 @@ function buildSession(
       minutes: mainMinutes,
       icon: "⌁",
       objective: focus === "Stability" ? "Maintain balance and posture while the boat is moving." : focus === "Technique" ? "Transfer pressure cleanly through a repeatable stroke sequence." : focus === "Endurance" ? "Hold efficient technique and one crew rhythm as duration increases." : focus === "Power" ? "Increase force per stroke while protecting connection and crew timing." : "Reach race rate without trading away connection, timing, or clean exits.",
-      set: mainSet(focus, crew, festivalWeeks, intervalPlan),
+      set: mainSet(focus, festivalWeeks, intervalPlan),
       cues: [focusCopy[focus].cue],
     });
 
@@ -488,6 +495,63 @@ function downloadJson(filename: string, data: unknown) {
   link.download = filename;
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(link.href), 0);
+}
+
+type BackupEnvelope = {
+  version: number;
+  exportedAt: string;
+  data?: Record<string, string>;
+  encrypted?: true;
+  algorithm?: "AES-GCM";
+  iterations?: number;
+  salt?: string;
+  iv?: string;
+  ciphertext?: string;
+};
+
+const allowedBackupKey = (key: string) => key.startsWith("kdbc-") || key.startsWith("dragonboat-");
+
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return window.btoa(binary);
+}
+
+function base64ToBytes(value: string) {
+  const binary = window.atob(value);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function asArrayBuffer(bytes: Uint8Array) {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+async function deriveBackupKey(passphrase: string, salt: Uint8Array, iterations: number) {
+  const material = await window.crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+  return window.crypto.subtle.deriveKey({ name: "PBKDF2", salt: asArrayBuffer(salt), iterations, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+
+async function encryptBackup(data: Record<string, string>, passphrase: string): Promise<BackupEnvelope> {
+  const salt = window.crypto.getRandomValues(new Uint8Array(16));
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const iterations = 250_000;
+  const key = await deriveBackupKey(passphrase, salt, iterations);
+  const ciphertext = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv: asArrayBuffer(iv) }, key, new TextEncoder().encode(JSON.stringify(data)));
+  return { version: DATA_SCHEMA_VERSION, exportedAt: new Date().toISOString(), encrypted: true, algorithm: "AES-GCM", iterations, salt: bytesToBase64(salt), iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(ciphertext)) };
+}
+
+async function readBackupEnvelope(parsed: BackupEnvelope) {
+  if (!parsed || typeof parsed !== "object" || !Number.isInteger(parsed.version) || parsed.version < 1 || parsed.version > DATA_SCHEMA_VERSION) throw new Error("Unsupported backup version.");
+  let data: unknown = parsed.data;
+  if (parsed.encrypted) {
+    if (parsed.algorithm !== "AES-GCM" || !parsed.iterations || !parsed.salt || !parsed.iv || !parsed.ciphertext) throw new Error("Encrypted backup metadata is incomplete.");
+    const passphrase = window.prompt("Enter the passphrase for this encrypted backup") ?? "";
+    if (!passphrase) throw new Error("A passphrase is required.");
+    const key = await deriveBackupKey(passphrase, base64ToBytes(parsed.salt), parsed.iterations);
+    const plaintext = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv: asArrayBuffer(base64ToBytes(parsed.iv)) }, key, asArrayBuffer(base64ToBytes(parsed.ciphertext)));
+    data = JSON.parse(new TextDecoder().decode(plaintext));
+  }
+  return validateBackupData(data);
 }
 
 function ThemePicker({ theme, onChange }: { theme: ConsoleTheme; onChange: (theme: ConsoleTheme) => void }) {
@@ -537,7 +601,13 @@ export default function Home() {
   const [actualRpe, setActualRpe] = useState(6);
   const [reviewConditions, setReviewConditions] = useState("");
   const [revisit, setRevisit] = useState("");
+  const [drillUsed, setDrillUsed] = useState("");
+  const [drillEffectiveness, setDrillEffectiveness] = useState<number | null>(null);
   const [trainingHydrated, setTrainingHydrated] = useState(false);
+  const [sessionId, setSessionId] = useState("");
+  const [editingReviewId, setEditingReviewId] = useState("");
+  const lastDialogTrigger = useRef<HTMLElement | null>(null);
+  const dialogWasOpen = useRef(false);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("kdbc-console-theme");
@@ -548,17 +618,37 @@ export default function Home() {
 
   useEffect(() => {
     const closeOverlays = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setLibraryOpen(false);
-      setPrintOpen(false);
+      if (event.key === "Escape") {
+        setLibraryOpen(false);
+        setPrintOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const dialog = document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]');
+      if (!dialog) return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable.at(-1) as HTMLElement;
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     };
     window.addEventListener("keydown", closeOverlays);
     return () => window.removeEventListener("keydown", closeOverlays);
   }, []);
 
   useEffect(() => {
+    const open = libraryOpen || printOpen;
+    if (open && !dialogWasOpen.current) lastDialogTrigger.current = document.activeElement as HTMLElement;
+    if (!open && dialogWasOpen.current) window.requestAnimationFrame(() => lastDialogTrigger.current?.focus());
+    dialogWasOpen.current = open;
+  }, [libraryOpen, printOpen]);
+
+  useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       try {
+        const activeSessionId = migrateLegacySession(window.localStorage);
+        setSessionId(activeSessionId);
         const draft = JSON.parse(window.localStorage.getItem("kdbc-active-session-v2") ?? "null") as (SavedPlan & { title?: string }) | null;
         if (draft) {
           const normalizedFocus = normalizeFocus(draft.focus);
@@ -577,8 +667,9 @@ export default function Home() {
             setLoadedPlanTitle(draft.title || `${normalizedFocus} Practice`);
           }
         }
-        setReviews(JSON.parse(window.localStorage.getItem("kdbc-practice-reviews-v1") ?? "[]") as PracticeReview[]);
-        window.localStorage.setItem("kdbc-data-schema-version", "2");
+        const storedReviews = JSON.parse(window.localStorage.getItem("kdbc-practice-reviews-v1") ?? "[]") as (PracticeReview & { sessionId?: string })[];
+        setReviews(storedReviews.map((review) => ({ ...review, sessionId: review.sessionId || activeSessionId, drillUsed: review.drillUsed || "", drillEffectiveness: review.drillEffectiveness ?? null })));
+        window.localStorage.setItem("kdbc-data-schema-version", String(DATA_SCHEMA_VERSION));
       } catch {
         window.localStorage.removeItem("kdbc-active-session-v2");
       }
@@ -596,12 +687,16 @@ export default function Home() {
   const mainMinutes = session.find((block) => block.id === "main")?.minutes ?? 0;
   const intervalMinutes = intervalTotalSeconds(intervalPlan) / 60;
   const selectedDiagnostic = DIAGNOSTICS.find((item) => item.issue === diagnosticKey) ?? null;
+  const selectedDiagnosticHistory = selectedDiagnostic ? reviews.filter((review) => review.drillUsed === selectedDiagnostic.drill.name && review.drillEffectiveness !== null) : [];
   const nextPractice = useMemo(() => {
     if (!reviews.length) return `Begin with ${focus} and record the post-practice result.`;
-    const latest = reviews[0];
+    const ordered = [...reviews].sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+    const latest = ordered[0];
     if (latest.status !== "completed" || latest.revisit.trim()) return `Repeat ${latest.focus} and address: ${latest.revisit || "the modified session conditions"}.`;
-    const completedSamePhase = reviews.filter((item) => item.focus === latest.focus && item.status === "completed" && !item.revisit.trim()).slice(0, 2).length;
-    if (completedSamePhase < 2) return `Repeat ${latest.focus} once more to confirm the quality is stable.`;
+    if (latest.actualRpe >= 9) return `Repeat ${latest.focus} at a more sustainable load; the latest actual RPE was ${latest.actualRpe}.`;
+    const consecutive = ordered.slice(0, 2);
+    const twoClean = consecutive.length === 2 && consecutive.every((item) => item.focus === latest.focus && item.status === "completed" && !item.revisit.trim() && item.actualRpe <= 8);
+    if (!twoClean) return `Repeat ${latest.focus} once more to confirm the quality is stable in consecutive sessions.`;
     const next = FOCUSES[Math.min(PHASE_POSITION[latest.focus] + 1, FOCUSES.length - 1)];
     return next === latest.focus ? "Maintain Speed while rotating technical emphasis." : `Progress to ${next}; continue timing as a standard throughout the session.`;
   }, [focus, reviews]);
@@ -623,7 +718,13 @@ export default function Home() {
       blocks: session,
       intervalPlan,
     } satisfies SavedPlan));
-  }, [crew, duration, emphasis, festivalWeeks, focus, intervalPlan, notes, session, sessionDate, sessionTitle, trainingHydrated, variation]);
+    if (sessionId) updateSession(window.localStorage, sessionId, {
+      title: sessionTitle,
+      date: sessionDate,
+      training: { focus, duration, crew, festivalWeeks, emphasis, variation, blocks: session, intervalPlan },
+      coachNotes: notes,
+    });
+  }, [crew, duration, emphasis, festivalWeeks, focus, intervalPlan, notes, session, sessionDate, sessionId, sessionTitle, trainingHydrated, variation]);
 
   function clearLoadedPractice() {
     setLoadedBlocks(null);
@@ -685,6 +786,7 @@ export default function Home() {
     const saved = JSON.parse(window.localStorage.getItem("dragonboat-plans") ?? "[]") as SavedPlan[];
     const plan: SavedPlan = {
       id: String(Date.now()),
+      sessionId,
       title: sessionTitle,
       savedAt: new Date().toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" }),
       focus,
@@ -698,13 +800,15 @@ export default function Home() {
       intervalPlan,
       sessionDate,
     };
-    const next = [plan, ...saved].slice(0, 12);
+    const next = [plan, ...saved].slice(0, 20);
     window.localStorage.setItem("dragonboat-plans", JSON.stringify(next));
     setSavedPlans(next);
     showNotice("Practice saved on this device");
   }
 
   function loadPlan(plan: SavedPlan) {
+    const nextSessionId = plan.sessionId || newSessionId();
+    setSessionId(nextSessionId);
     setFocus(normalizeFocus(plan.focus));
     setDuration(plan.duration);
     setCrew(plan.crew);
@@ -718,6 +822,7 @@ export default function Home() {
     setSessionDate(plan.sessionDate || new Date().toISOString().slice(0, 10));
     setIntervalPlan(plan.intervalPlan ?? defaultInterval(normalizeFocus(plan.focus), plan.crew));
     setLibraryOpen(false);
+    updateSession(window.localStorage, nextSessionId, { title: plan.title || `${normalizeFocus(plan.focus)} Practice`, date: plan.sessionDate || new Date().toISOString().slice(0, 10), training: plan, coachNotes: plan.notes });
     showNotice("Saved practice loaded");
   }
 
@@ -750,7 +855,8 @@ export default function Home() {
 
   function saveReview() {
     const review: PracticeReview = {
-      id: String(Date.now()),
+      id: editingReviewId || String(Date.now()),
+      sessionId,
       sessionTitle,
       sessionDate,
       focus,
@@ -758,14 +864,56 @@ export default function Home() {
       actualRpe,
       conditions: reviewConditions.trim(),
       revisit: revisit.trim(),
+      drillUsed,
+      drillEffectiveness,
       savedAt: new Date().toISOString(),
     };
-    const next = [review, ...reviews].slice(0, 50);
+    const next = editingReviewId ? reviews.map((item) => item.id === editingReviewId ? review : item) : [review, ...reviews].slice(0, 50);
     setReviews(next);
     window.localStorage.setItem("kdbc-practice-reviews-v1", JSON.stringify(next));
+    if (sessionId) updateSession(window.localStorage, sessionId, { review, conditions: review.conditions });
+    setEditingReviewId("");
     setReviewConditions("");
     setRevisit("");
-    showNotice("Post-practice review saved");
+    setDrillUsed("");
+    setDrillEffectiveness(null);
+    showNotice(editingReviewId ? "Practice review updated" : "Post-practice review saved");
+  }
+
+  function editReview(review: PracticeReview) {
+    setEditingReviewId(review.id);
+    setSessionId(review.sessionId || sessionId);
+    setSessionTitle(review.sessionTitle);
+    setSessionDate(review.sessionDate);
+    setFocus(review.focus);
+    setReviewStatus(review.status);
+    setActualRpe(review.actualRpe);
+    setReviewConditions(review.conditions);
+    setRevisit(review.revisit);
+    setDrillUsed(review.drillUsed);
+    setDrillEffectiveness(review.drillEffectiveness);
+    document.getElementById("practice-review-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function deleteReview(id: string) {
+    if (!window.confirm("Delete this practice review?")) return;
+    const next = reviews.filter((review) => review.id !== id);
+    setReviews(next);
+    window.localStorage.setItem("kdbc-practice-reviews-v1", JSON.stringify(next));
+    if (editingReviewId === id) setEditingReviewId("");
+    showNotice("Practice review deleted");
+  }
+
+  function startNewSession() {
+    const id = newSessionId();
+    setSessionId(id);
+    const date = new Date().toISOString().slice(0, 10);
+    setSessionDate(date);
+    setSessionTitle(`${focus} Practice`);
+    setLoadedBlocks(null);
+    setLoadedPlanTitle("");
+    updateSession(window.localStorage, id, { title: `${focus} Practice`, date });
+    showNotice("New session started");
   }
 
   async function copyPlan() {
@@ -807,11 +955,24 @@ export default function Home() {
     const keys = Object.keys(window.localStorage).filter((key) => key.startsWith("kdbc-") || key.startsWith("dragonboat-")).sort();
     const data = Object.fromEntries(keys.map((key) => [key, window.localStorage.getItem(key)]));
     downloadJson(`kdbc-coach-tools-backup-${new Date().toISOString().slice(0, 10)}.json`, {
-      version: 2,
+      version: DATA_SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
       data,
     });
     showNotice("Backup downloaded");
+  }
+
+  async function exportEncryptedWorkspaceData() {
+    const passphrase = window.prompt("Create a passphrase for this encrypted backup (at least 10 characters)") ?? "";
+    if (passphrase.length < 10) {
+      showNotice("Use a passphrase with at least 10 characters");
+      return;
+    }
+    const keys = Object.keys(window.localStorage).filter(allowedBackupKey).sort();
+    const data = Object.fromEntries(keys.map((key) => [key, window.localStorage.getItem(key) ?? ""]));
+    const envelope = await encryptBackup(data, passphrase);
+    downloadJson(`kdbc-coach-tools-encrypted-${new Date().toISOString().slice(0, 10)}.json`, envelope);
+    showNotice("Encrypted backup downloaded");
   }
 
   async function importWorkspaceData(event: ChangeEvent<HTMLInputElement>) {
@@ -819,16 +980,15 @@ export default function Home() {
     event.target.value = "";
     if (!file) return;
     try {
-      const parsed = JSON.parse(await file.text());
-      const data = parsed?.data && typeof parsed.data === "object" ? parsed.data as Record<string, string> : null;
-      if (!data) throw new Error("Backup file is missing its data section.");
-      Object.entries(data).forEach(([key, value]) => {
-        if ((key.startsWith("kdbc-") || key.startsWith("dragonboat-")) && typeof value === "string") window.localStorage.setItem(key, value);
-      });
+      const parsed = JSON.parse(await file.text()) as BackupEnvelope;
+      const data = await readBackupEnvelope(parsed);
+      if (!window.confirm("Replace the current device workspace with this validated backup?")) return;
+      Object.keys(window.localStorage).filter(allowedBackupKey).forEach((key) => window.localStorage.removeItem(key));
+      Object.entries(data).forEach(([key, value]) => window.localStorage.setItem(key, value));
       showNotice("Backup restored. Reloading…");
       window.setTimeout(() => window.location.reload(), 450);
-    } catch {
-      showNotice("Backup could not be restored");
+    } catch (reason) {
+      showNotice(reason instanceof Error ? reason.message : "Backup could not be restored");
     }
   }
 
@@ -854,13 +1014,14 @@ export default function Home() {
         {module === "training" ? <button className="saved-button" onClick={openLibrary} type="button" aria-label="Open saved practices"><span aria-hidden="true">▱</span> Saved practices</button> : <span className="device-badge">⌂ Device-only data</span>}
         <div className="data-actions" aria-label="Device data controls">
           <button onClick={exportWorkspaceData} type="button">Export data</button>
+          <button onClick={exportEncryptedWorkspaceData} type="button">Encrypted backup</button>
           <label>Restore<input accept="application/json,.json" onChange={importWorkspaceData} type="file" /></label>
           <button onClick={clearPrivateData} type="button">Clear</button>
         </div>
         <div className="coach-avatar" title="Coach Nico" aria-label="Coach Nico">NS</div>
       </header>
 
-      {module === "boats" ? <BoatPlanner onThemeChange={changeTheme} sessionDate={sessionDate} sessionTitle={sessionTitle} theme={theme} /> : <>
+      {module === "boats" ? <BoatPlanner onThemeChange={changeTheme} sessionDate={sessionDate} sessionId={sessionId} sessionTitle={sessionTitle} theme={theme} /> : <>
 
       <section className="display-switcher-wrap" aria-label="Training console display">
         <div className="display-switcher-copy"><span>Display</span><strong>Training console</strong></div>
@@ -888,6 +1049,7 @@ export default function Home() {
           <div className="session-identity">
             <label><span>Session name</span><input onChange={(event) => setSessionTitle(event.target.value)} value={sessionTitle} /></label>
             <label><span>Practice date</span><input onChange={(event) => setSessionDate(event.target.value)} type="date" value={sessionDate} /></label>
+            <button onClick={startNewSession} type="button">+ New session</button>
           </div>
 
           <div className="phase-ladder" aria-label="Season training progression">
@@ -995,7 +1157,7 @@ export default function Home() {
           <section className="diagnostic-panel">
             <div><p className="eyebrow">What are you seeing?</p><h3>Diagnostic drill selector</h3><p>Choose the largest boat-wide limiter. The tool recommends one drill and one cue.</p></div>
             <label><span>Observed issue</span><select onChange={(event) => setDiagnosticKey(event.target.value)} value={diagnosticKey}><option value="">Choose an observed issue…</option>{DIAGNOSTICS.map((item) => <option key={item.issue}>{item.issue}</option>)}</select></label>
-            {selectedDiagnostic && <div className="diagnostic-result"><span>Recommended drill</span><strong>{selectedDiagnostic.drill.name}</strong><p>{selectedDiagnostic.why}</p><b>Primary cue: {selectedDiagnostic.drill.cues[0]}</b><button onClick={applyDiagnostic} type="button">Use this drill in the plan</button></div>}
+            {selectedDiagnostic && <div className="diagnostic-result"><span>Recommended drill · {selectedDiagnostic.drill.status === "limited" ? "limited-use" : "active"}</span><strong>{selectedDiagnostic.drill.name}</strong><p>{selectedDiagnostic.why}</p><b>Primary cue: {selectedDiagnostic.drill.cues[0]}</b>{selectedDiagnosticHistory.length > 0 && <small>Previous use: {selectedDiagnosticHistory.length} review{selectedDiagnosticHistory.length === 1 ? "" : "s"}; average effectiveness {(selectedDiagnosticHistory.reduce((sum, review) => sum + Number(review.drillEffectiveness), 0) / selectedDiagnosticHistory.length).toFixed(1)}/5.</small>}<button onClick={applyDiagnostic} type="button">Use this drill in the plan</button></div>}
           </section>
           <section className="next-practice-panel">
             <p className="eyebrow">Recent history</p><h3>Next-practice guidance</h3><p>{nextPractice}</p><small>Progression only advances after two completed sessions without an unresolved issue.</small>
@@ -1041,8 +1203,12 @@ export default function Home() {
           <label><span>Actual RPE</span><input min="1" max="10" onChange={(event) => setActualRpe(Number(event.target.value))} type="number" value={actualRpe} /></label>
           <label><span>Conditions / changes</span><input onChange={(event) => setReviewConditions(event.target.value)} placeholder="Wind, attendance, shortened set…" value={reviewConditions} /></label>
           <label><span>Issue to revisit</span><input onChange={(event) => setRevisit(event.target.value)} placeholder="Leave blank if the quality held" value={revisit} /></label>
+          <label><span>Drill reviewed</span><select onChange={(event) => setDrillUsed(event.target.value)} value={drillUsed}><option value="">None selected</option>{session.filter((block) => block.id.startsWith("drill-")).map((block) => <option key={block.id} value={block.detail}>{block.detail}</option>)}</select></label>
+          <label><span>Drill effectiveness</span><select disabled={!drillUsed} onChange={(event) => setDrillEffectiveness(event.target.value ? Number(event.target.value) : null)} value={drillEffectiveness ?? ""}><option value="">Not rated</option><option value="1">1 — Did not help</option><option value="2">2 — Limited change</option><option value="3">3 — Useful</option><option value="4">4 — Clear improvement</option><option value="5">5 — Strong correction</option></select></label>
         </div>
-        <button className="review-save" onClick={saveReview} type="button">Save practice review</button>
+        <button className="review-save" onClick={saveReview} type="button">{editingReviewId ? "Update practice review" : "Save practice review"}</button>
+        {editingReviewId && <button className="review-cancel" onClick={() => { setEditingReviewId(""); setReviewConditions(""); setRevisit(""); setDrillUsed(""); setDrillEffectiveness(null); }} type="button">Cancel editing</button>}
+        {reviews.length > 0 && <div className="review-history"><h3>Recent reviews</h3>{[...reviews].sort((a, b) => b.savedAt.localeCompare(a.savedAt)).slice(0, 6).map((review) => <article key={review.id}><div><strong>{review.sessionTitle}</strong><span>{review.sessionDate} · {review.focus} · {review.status} · RPE {review.actualRpe}</span>{review.revisit && <small>Revisit: {review.revisit}</small>}</div><div><button onClick={() => editReview(review)} type="button">Edit</button><button onClick={() => deleteReview(review.id)} type="button">Delete</button></div></article>)}</div>}
       </section>
 
       {libraryOpen && (
