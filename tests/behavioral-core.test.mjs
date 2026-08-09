@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateTrim, evaluateEventEligibility, evidenceConfidence, replaceOneSeat, validateSeatAssignments } from "../app/boat-intelligence-core.ts";
+import { allocateBoatUnits, calculateTrim, evaluateEventEligibility, evidenceConfidence, replaceOneSeat, validateSeatAssignments } from "../app/boat-intelligence-core.ts";
 import { DATA_SCHEMA_VERSION, mergeSession, migrateLegacySession, parseSessionStore, validateBackupData } from "../app/session-store.ts";
 
 const paddler = (id, patch = {}) => ({
@@ -111,6 +111,35 @@ test("training ignores event eligibility while explicit event conflicts remain b
   assert.equal(evaluateEventEligibility(["Women", "Open", "Unconfirmed"], "women").allowed, false);
   assert.equal(evaluateEventEligibility(["Women", "Open", "Open", "Open"], "mixed").allowed, false);
   assert.equal(evaluateEventEligibility(["Women", "Women", "Ineligible", "Unconfirmed"], "mixed").allowed, false);
+});
+
+test("overflow paddlers become spares instead of false relationship conflicts", () => {
+  const paddlers = Array.from({ length: 21 }, (_, index) => ({
+    id: `p-${index + 1}`,
+    name: `Paddler ${index + 1}`,
+    avoidPairWith: "",
+    mustPairWith: "",
+    eventEligibility: "Unconfirmed",
+    allocationScore: 0,
+  }));
+  const result = allocateBoatUnits(paddlers.map((item) => [item]), [20], "balanced", "count");
+  assert.equal(result.groups[0].length, 20);
+  assert.equal(result.overflow.length, 1);
+  assert.equal(result.overflow[0].name, "Paddler 21");
+});
+
+test("blank relationship fields remain nonrestrictive across four full boats", () => {
+  const paddlers = Array.from({ length: 81 }, (_, index) => ({
+    id: `p-${index + 1}`,
+    name: `Paddler ${index + 1}`,
+    avoidPairWith: "   ",
+    mustPairWith: "",
+    eventEligibility: "Unconfirmed",
+    allocationScore: 0,
+  }));
+  const result = allocateBoatUnits(paddlers.map((item) => [item]), [20, 20, 20, 20], "balanced", "count");
+  assert.deepEqual(result.groups.map((group) => group.length), [20, 20, 20, 20]);
+  assert.equal(result.overflow.length, 1);
 });
 
 test("one-to-four boat assignment sets remain duplicate-free", () => {

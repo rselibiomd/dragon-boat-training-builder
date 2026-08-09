@@ -18,6 +18,78 @@ export type CoreSeat = {
 export type CoreCompositionRule = "count" | "mixed" | "women";
 export type CoreEventEligibility = "Unconfirmed" | "Open" | "Mixed" | "Women" | "Ineligible";
 
+export type CoreAllocationMember = {
+  id: string;
+  name: string;
+  avoidPairWith: string;
+  mustPairWith: string;
+  eventEligibility: CoreEventEligibility;
+  allocationScore: number;
+};
+
+export type CoreAllocationStrategy = "balanced" | "strongest";
+
+function referencesMember(reference: string, member: CoreAllocationMember) {
+  const normalized = reference.trim().toLowerCase();
+  return Boolean(normalized) && (member.id.toLowerCase() === normalized || member.name.toLowerCase() === normalized);
+}
+
+export function allocateBoatUnits<T extends CoreAllocationMember>(
+  units: T[][],
+  sizes: number[],
+  strategy: CoreAllocationStrategy,
+  compositionRule: CoreCompositionRule,
+  seededGroups: T[][] = [],
+) {
+  const groups = sizes.map((_, index) => [...(seededGroups[index] ?? [])]);
+  const overflow: T[] = [];
+  const potentialWomenCount = (group: T[]) => group.filter((paddler) => paddler.eventEligibility === "Women" || paddler.eventEligibility === "Unconfirmed").length;
+  const conflictsWithGroup = (unit: T[], group: T[]) => unit.some((paddler) => {
+    if (!paddler.avoidPairWith.trim()) return false;
+    return group.some((member) => referencesMember(paddler.avoidPairWith, member));
+  }) || group.some((member) => {
+    if (!member.avoidPairWith.trim()) return false;
+    return unit.some((paddler) => referencesMember(member.avoidPairWith, paddler));
+  });
+
+  units.forEach((unit) => {
+    const unitWomen = unit.filter((paddler) => paddler.eventEligibility === "Women").length;
+    const unitPotentialWomen = potentialWomenCount(unit);
+    const options = groups.map((group, index) => ({
+      index,
+      room: group.length + unit.length <= sizes[index],
+      conflict: conflictsWithGroup(unit, group),
+      average: group.length ? group.reduce((sum, item) => sum + item.allocationScore, 0) / group.length : 0,
+      size: group.length,
+      womenNeed: Math.max(0, Math.ceil(sizes[index] / 2) - group.filter((paddler) => paddler.eventEligibility === "Women").length),
+      potentialWomenNeed: Math.max(0, Math.ceil(sizes[index] / 2) - potentialWomenCount(group)),
+    })).filter((item) => item.room && !item.conflict);
+    const target = strategy === "strongest"
+      ? options.sort((a, b) => compositionRule === "mixed" && unitPotentialWomen ? b.potentialWomenNeed - a.potentialWomenNeed || (unitWomen ? b.womenNeed - a.womenNeed : 0) || a.index - b.index : a.index - b.index)[0]
+      : options.sort((a, b) => compositionRule === "mixed" && unitPotentialWomen ? b.potentialWomenNeed - a.potentialWomenNeed || (unitWomen ? b.womenNeed - a.womenNeed : 0) || a.average - b.average || a.size - b.size || a.index - b.index : a.average - b.average || a.size - b.size || a.index - b.index)[0];
+
+    if (target) {
+      groups[target.index].push(...unit);
+      return;
+    }
+
+    const remainingCapacity = groups.reduce((total, group, index) => total + Math.max(0, sizes[index] - group.length), 0);
+    if (remainingCapacity < unit.length) {
+      overflow.push(...unit);
+      return;
+    }
+
+    const hasRelationshipConstraint = unit.some((paddler) => paddler.mustPairWith.trim() || paddler.avoidPairWith.trim())
+      || groups.some((group) => conflictsWithGroup(unit, group));
+    if (hasRelationshipConstraint) {
+      throw new Error(`No feasible boat can satisfy the recorded must-pair / avoid-pair constraints for ${unit.map((item) => item.name).join(" and ")}.`);
+    }
+    throw new Error(`No feasible boat can place ${unit.map((item) => item.name).join(" and ")}. Review locked seats and boat capacity.`);
+  });
+
+  return { groups, overflow };
+}
+
 export function evaluateEventEligibility(eligibilities: CoreEventEligibility[], rule: CoreCompositionRule) {
   const total = eligibilities.length;
   const confirmedWomen = eligibilities.filter((value) => value === "Women").length;

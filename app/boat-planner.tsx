@@ -2,7 +2,7 @@
 
 import { ChangeEvent, DragEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { ConsoleTheme } from "./page";
-import { calculateTrim, evaluateEventEligibility, evidenceConfidence, validateSeatAssignments } from "./boat-intelligence-core";
+import { allocateBoatUnits, calculateTrim, evaluateEventEligibility, evidenceConfidence, validateSeatAssignments } from "./boat-intelligence-core";
 import { updateSession } from "./session-store";
 
 type Side = "L" | "R" | "Either";
@@ -584,35 +584,19 @@ function createBoats(paddlers: Paddler[], boatCount: number, strategy: Strategy,
     unit.forEach((item) => pending.delete(item.id));
     units.push(unit);
   });
-  const conflictsWithGroup = (unit: Paddler[], group: Paddler[]) => unit.some((paddler) => {
-    const avoided = paddler.avoidPairWith.toLowerCase();
-    if (!avoided) return false;
-    return group.some((member) => member.id.toLowerCase() === avoided || member.name.toLowerCase() === avoided);
-  }) || group.some((member) => {
-    const avoided = member.avoidPairWith.toLowerCase();
-    return avoided && unit.some((paddler) => paddler.id.toLowerCase() === avoided || paddler.name.toLowerCase() === avoided);
-  });
-  const potentialWomenCount = (group: Paddler[]) => group.filter((paddler) => paddler.eventEligibility === "Women" || paddler.eventEligibility === "Unconfirmed").length;
   units.sort((a, b) => compositionRule === "mixed"
     ? b.filter((paddler) => paddler.eventEligibility === "Women").length - a.filter((paddler) => paddler.eventEligibility === "Women").length
       || b.filter((paddler) => paddler.eventEligibility === "Unconfirmed").length - a.filter((paddler) => paddler.eventEligibility === "Unconfirmed").length
-    : 0).forEach((unit) => {
-    const unitWomen = unit.filter((paddler) => paddler.eventEligibility === "Women").length;
-    const unitPotentialWomen = potentialWomenCount(unit);
-    const options = groups.map((group, index) => ({
-      index,
-      room: group.length + unit.length <= sizes[index],
-      conflict: conflictsWithGroup(unit, group),
-      average: group.length ? group.reduce((sum, item) => sum + composite(item), 0) / group.length : 0,
-      size: group.length,
-      womenNeed: Math.max(0, Math.ceil(sizes[index] / 2) - group.filter((paddler) => paddler.eventEligibility === "Women").length),
-      potentialWomenNeed: Math.max(0, Math.ceil(sizes[index] / 2) - potentialWomenCount(group)),
-    })).filter((item) => item.room && !item.conflict);
-    const target = strategy === "strongest"
-      ? options.sort((a, b) => compositionRule === "mixed" && unitPotentialWomen ? b.potentialWomenNeed - a.potentialWomenNeed || (unitWomen ? b.womenNeed - a.womenNeed : 0) || a.index - b.index : a.index - b.index)[0]
-      : options.sort((a, b) => compositionRule === "mixed" && unitPotentialWomen ? b.potentialWomenNeed - a.potentialWomenNeed || (unitWomen ? b.womenNeed - a.womenNeed : 0) || a.average - b.average || a.index - b.index : a.average - b.average || a.size - b.size || a.index - b.index)[0];
-    if (!target) throw new Error(`No feasible boat can satisfy the must-pair / avoid-pair constraints for ${unit.map((item) => item.name).join(" and ")}.`);
-    groups[target.index].push(...unit);
+    : 0);
+  const allocation = allocateBoatUnits(
+    units.map((unit) => unit.map((paddler) => ({ ...paddler, allocationScore: composite(paddler) }))),
+    sizes,
+    strategy,
+    compositionRule,
+    groups.map((group) => group.map((paddler) => ({ ...paddler, allocationScore: composite(paddler) }))),
+  );
+  allocation.groups.forEach((group, index) => {
+    groups[index] = group;
   });
   if (compositionRule === "mixed" && groups.some((group) => !evaluateEventEligibility(group.map((paddler) => paddler.eventEligibility), "mixed").allowed)) {
     throw new Error("The recorded pair constraints and known event eligibility cannot produce a confirmed or provisional mixed crew for every boat. Adjust a constraint or build fewer boats.");
@@ -971,6 +955,7 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
       setRebuildNeeded(false);
       setUndoStack([]);
       setRedoStack([]);
+      if (result.spares.length) showNotice(`${result.boats.length} boat${result.boats.length === 1 ? "" : "s"} built · ${result.spares.length} paddler${result.spares.length === 1 ? "" : "s"} kept as spares`);
       window.setTimeout(() => document.getElementById("boat-lineups")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The boats could not be generated.");
