@@ -15,6 +15,47 @@ export type CoreSeat = {
   rightId: string | null;
 };
 
+export type CoreCompositionRule = "count" | "mixed" | "women";
+export type CoreEventEligibility = "Unconfirmed" | "Open" | "Mixed" | "Women" | "Ineligible";
+
+export function evaluateEventEligibility(eligibilities: CoreEventEligibility[], rule: CoreCompositionRule) {
+  const total = eligibilities.length;
+  const confirmedWomen = eligibilities.filter((value) => value === "Women").length;
+  const unconfirmed = eligibilities.filter((value) => value === "Unconfirmed").length;
+  const ineligible = eligibilities.filter((value) => value === "Ineligible").length;
+  const requiredWomen = rule === "mixed" ? Math.ceil(total / 2) : rule === "women" ? total : 0;
+
+  if (rule === "count") {
+    return { allowed: true, provisional: false, total, confirmedWomen, unconfirmed, ineligible, requiredWomen, incompatible: 0 };
+  }
+
+  if (rule === "women") {
+    const incompatible = eligibilities.filter((value) => value !== "Women" && value !== "Unconfirmed").length;
+    return {
+      allowed: incompatible === 0,
+      provisional: incompatible === 0 && unconfirmed > 0,
+      total,
+      confirmedWomen,
+      unconfirmed,
+      ineligible,
+      requiredWomen,
+      incompatible,
+    };
+  }
+
+  const potentialWomen = confirmedWomen + unconfirmed;
+  return {
+    allowed: ineligible === 0 && potentialWomen >= requiredWomen,
+    provisional: ineligible === 0 && confirmedWomen < requiredWomen && potentialWomen >= requiredWomen,
+    total,
+    confirmedWomen,
+    unconfirmed,
+    ineligible,
+    requiredWomen,
+    incompatible: ineligible,
+  };
+}
+
 export function calculateTrim(seats: CoreSeat[], paddlers: CorePaddler[]) {
   const paddlerMap = new Map(paddlers.map((paddler) => [paddler.id, paddler]));
   const entries = seats.flatMap((seat) => ([

@@ -2,7 +2,7 @@
 
 import { ChangeEvent, DragEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { ConsoleTheme } from "./page";
-import { calculateTrim, evidenceConfidence, validateSeatAssignments } from "./boat-intelligence-core";
+import { calculateTrim, evaluateEventEligibility, evidenceConfidence, validateSeatAssignments } from "./boat-intelligence-core";
 import { updateSession } from "./session-store";
 
 type Side = "L" | "R" | "Either";
@@ -515,12 +515,14 @@ function boatWarnings(boat: Boat, paddlerMap: Map<string, Paddler>, compositionR
   const front = boat.seats.filter((seat) => seat.active && seat.row <= 3).flatMap((seat) => [seat.leftId, seat.rightId]).filter(Boolean).map((id) => paddlerMap.get(id as string)).filter(Boolean) as Paddler[];
   const frontQuality = averageKnown(front, ["timing", "connection"]);
   if (frontQuality !== null && frontQuality < 3) warnings.push("Lead section may need stronger timing or connection support.");
-  const womenEligible = assigned.filter((paddler) => paddler.eventEligibility === "Women").length;
-  const unconfirmedEligibility = assigned.filter((paddler) => paddler.eventEligibility === "Unconfirmed").length;
+  const eligibility = evaluateEventEligibility(assigned.map((paddler) => paddler.eventEligibility), compositionRule);
   const ineligible = assigned.filter((paddler) => paddler.eventEligibility === "Ineligible");
-  if (compositionRule === "mixed" && womenEligible < Math.ceil(assigned.length / 2)) warnings.push(`Mixed event rule unresolved: ${womenEligible}/${assigned.length} paddlers are confirmed for the women-eligible category${unconfirmedEligibility ? `; ${unconfirmedEligibility} unconfirmed` : ""}.`);
-  if (compositionRule === "women" && assigned.some((paddler) => paddler.eventEligibility !== "Women")) warnings.push(`Women’s event rule unresolved${unconfirmedEligibility ? `; ${unconfirmedEligibility} eligibility value${unconfirmedEligibility === 1 ? " is" : "s are"} unconfirmed` : ""}.`);
-  if (ineligible.length) warnings.push(`${ineligible.map((paddler) => paddler.name).join(", ")} ${ineligible.length === 1 ? "is" : "are"} marked ineligible for this event.`);
+  const incompatibleWomen = assigned.filter((paddler) => !["Women", "Unconfirmed"].includes(paddler.eventEligibility));
+  if (compositionRule === "mixed" && eligibility.provisional) warnings.push(`Mixed event eligibility is provisional: ${eligibility.confirmedWomen}/${eligibility.requiredWomen} required women-eligible places are confirmed; ${eligibility.unconfirmed} paddler${eligibility.unconfirmed === 1 ? " is" : "s are"} still unconfirmed.`);
+  if (compositionRule === "mixed" && !eligibility.allowed && !ineligible.length) warnings.push(`Mixed event rule cannot be met: ${eligibility.confirmedWomen} confirmed plus ${eligibility.unconfirmed} unconfirmed cannot fill ${eligibility.requiredWomen} required women-eligible places.`);
+  if (compositionRule === "women" && eligibility.provisional) warnings.push(`Women’s event eligibility is provisional: ${eligibility.unconfirmed} paddler${eligibility.unconfirmed === 1 ? " is" : "s are"} still unconfirmed.`);
+  if (compositionRule === "women" && incompatibleWomen.length) warnings.push(`${incompatibleWomen.map((paddler) => paddler.name).join(", ")} ${incompatibleWomen.length === 1 ? "does" : "do"} not have women’s-event eligibility recorded.`);
+  if (compositionRule !== "count" && ineligible.length) warnings.push(`${ineligible.map((paddler) => paddler.name).join(", ")} ${ineligible.length === 1 ? "is" : "are"} marked ineligible for this event.`);
   assigned.forEach((paddler) => {
     const mustPair = paddler.mustPairWith && assigned.some((item) => item.id === paddler.mustPairWith || item.name === paddler.mustPairWith);
     if (paddler.mustPairWith && !mustPair) warnings.push(`${paddler.name}'s must-pair constraint is not satisfied.`);
@@ -541,12 +543,14 @@ function createBoats(paddlers: Paddler[], boatCount: number, strategy: Strategy,
   const drummers = paddlers.filter((paddler) => paddler.participating && paddler.sessionRole === "Drummer");
   const sizes = targetBoatSizes(attending.length, boatCount);
   if (sizes.some((size) => size < 10)) throw new Error(`You need at least ${boatCount * 10} participating paddlers for ${boatCount} boats.`);
-  if (compositionRule === "women") {
-    const unresolved = attending.filter((paddler) => paddler.eventEligibility !== "Women");
-    if (unresolved.length) throw new Error(`No feasible women’s-event lineup: confirm women-category eligibility or deselect ${unresolved.slice(0, 4).map((paddler) => paddler.name).join(", ")}${unresolved.length > 4 ? " and others" : ""}.`);
+  const eventEligibility = evaluateEventEligibility(attending.map((paddler) => paddler.eventEligibility), compositionRule);
+  if (!eventEligibility.allowed && compositionRule === "women") {
+    const incompatible = attending.filter((paddler) => !["Women", "Unconfirmed"].includes(paddler.eventEligibility));
+    throw new Error(`No feasible women’s-event lineup: update or deselect ${incompatible.slice(0, 4).map((paddler) => paddler.name).join(", ")}${incompatible.length > 4 ? " and others" : ""}. Unconfirmed eligibility is allowed provisionally.`);
   }
-  if (compositionRule === "mixed" && attending.filter((paddler) => paddler.eventEligibility === "Women").length < Math.ceil(sizes.reduce((sum, size) => sum + size, 0) / 2)) {
-    throw new Error("No feasible mixed-event lineup: fewer than half of the paddling seats have confirmed women-category eligibility.");
+  if (!eventEligibility.allowed && compositionRule === "mixed") {
+    if (eventEligibility.ineligible) throw new Error("No feasible mixed-event lineup: one or more participating paddlers are explicitly marked ineligible. Update or deselect them; unconfirmed eligibility is allowed provisionally.");
+    throw new Error(`No feasible mixed-event lineup: ${eventEligibility.confirmedWomen} confirmed plus ${eventEligibility.unconfirmed} unconfirmed cannot fill ${eventEligibility.requiredWomen} required women-eligible places.`);
   }
   const sideCapacity = sizes.reduce((sum, size) => sum + size / 2, 0);
   const requiredLeft = attending.filter((paddler) => paddler.sideExclusive && paddler.sidePref === "L").length;
@@ -588,8 +592,13 @@ function createBoats(paddlers: Paddler[], boatCount: number, strategy: Strategy,
     const avoided = member.avoidPairWith.toLowerCase();
     return avoided && unit.some((paddler) => paddler.id.toLowerCase() === avoided || paddler.name.toLowerCase() === avoided);
   });
-  units.sort((a, b) => compositionRule === "mixed" ? b.filter((paddler) => paddler.eventEligibility === "Women").length - a.filter((paddler) => paddler.eventEligibility === "Women").length : 0).forEach((unit) => {
+  const potentialWomenCount = (group: Paddler[]) => group.filter((paddler) => paddler.eventEligibility === "Women" || paddler.eventEligibility === "Unconfirmed").length;
+  units.sort((a, b) => compositionRule === "mixed"
+    ? b.filter((paddler) => paddler.eventEligibility === "Women").length - a.filter((paddler) => paddler.eventEligibility === "Women").length
+      || b.filter((paddler) => paddler.eventEligibility === "Unconfirmed").length - a.filter((paddler) => paddler.eventEligibility === "Unconfirmed").length
+    : 0).forEach((unit) => {
     const unitWomen = unit.filter((paddler) => paddler.eventEligibility === "Women").length;
+    const unitPotentialWomen = potentialWomenCount(unit);
     const options = groups.map((group, index) => ({
       index,
       room: group.length + unit.length <= sizes[index],
@@ -597,15 +606,16 @@ function createBoats(paddlers: Paddler[], boatCount: number, strategy: Strategy,
       average: group.length ? group.reduce((sum, item) => sum + composite(item), 0) / group.length : 0,
       size: group.length,
       womenNeed: Math.max(0, Math.ceil(sizes[index] / 2) - group.filter((paddler) => paddler.eventEligibility === "Women").length),
+      potentialWomenNeed: Math.max(0, Math.ceil(sizes[index] / 2) - potentialWomenCount(group)),
     })).filter((item) => item.room && !item.conflict);
     const target = strategy === "strongest"
-      ? options.sort((a, b) => compositionRule === "mixed" && unitWomen ? b.womenNeed - a.womenNeed || a.index - b.index : a.index - b.index)[0]
-      : options.sort((a, b) => compositionRule === "mixed" && unitWomen ? b.womenNeed - a.womenNeed || a.average - b.average || a.index - b.index : a.average - b.average || a.size - b.size || a.index - b.index)[0];
+      ? options.sort((a, b) => compositionRule === "mixed" && unitPotentialWomen ? b.potentialWomenNeed - a.potentialWomenNeed || (unitWomen ? b.womenNeed - a.womenNeed : 0) || a.index - b.index : a.index - b.index)[0]
+      : options.sort((a, b) => compositionRule === "mixed" && unitPotentialWomen ? b.potentialWomenNeed - a.potentialWomenNeed || (unitWomen ? b.womenNeed - a.womenNeed : 0) || a.average - b.average || a.index - b.index : a.average - b.average || a.size - b.size || a.index - b.index)[0];
     if (!target) throw new Error(`No feasible boat can satisfy the must-pair / avoid-pair constraints for ${unit.map((item) => item.name).join(" and ")}.`);
     groups[target.index].push(...unit);
   });
-  if (compositionRule === "mixed" && groups.some((group, index) => group.filter((paddler) => paddler.eventEligibility === "Women").length < Math.ceil(sizes[index] / 2))) {
-    throw new Error("The recorded must-pair, avoid-pair, and event-eligibility constraints cannot produce a compliant mixed crew for every boat. Adjust a constraint or build fewer boats.");
+  if (compositionRule === "mixed" && groups.some((group) => !evaluateEventEligibility(group.map((paddler) => paddler.eventEligibility), "mixed").allowed)) {
+    throw new Error("The recorded pair constraints and known event eligibility cannot produce a confirmed or provisional mixed crew for every boat. Adjust a constraint or build fewer boats.");
   }
   const paddlerMap = new Map(paddlers.map((paddler) => [paddler.id, paddler]));
   const boats = groups.map((group, index) => {
@@ -664,7 +674,7 @@ function boatDataConfidence(boat: Boat, paddlerMap: Map<string, Paddler>) {
 }
 
 function constraintStatus(boat: Boat) {
-  const hard = boat.warnings.filter((warning) => /exclusive|must-pair|avoid-pair|ineligible|event rule|row|No steer|No drummer/i.test(warning));
+  const hard = boat.warnings.filter((warning) => /exclusive|must-pair|avoid-pair|ineligible|event rule|does not have women’s-event eligibility|row|No steer|No drummer/i.test(warning));
   return hard.length ? "Conflict" : boat.warnings.length ? "Review" : "Ready";
 }
 
@@ -1378,7 +1388,7 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
             <button className={strategy === "strongest" ? "active" : ""} onClick={() => changeStrategy("strongest")} type="button"><strong>Strongest-first</strong><small>Rank Boat 1 before the next</small></button>
           </div>
           <label className="planner-field"><span>Event rule preset</span><select onChange={(event) => changeCompositionRule(event.target.value as CompositionRule)} value={compositionRule}><option value="count">KDBC training — counts only</option><option value="mixed">Mixed event — at least 50% women-eligible</option><option value="women">Women’s event — confirmed eligibility</option></select></label>
-          <p className="capacity-note">Event eligibility is recorded separately from gender identity and is always shown as a constraint check.</p>
+          <p className="capacity-note">Unconfirmed eligibility does not block boat creation. Event boats remain provisional until the required eligibility is confirmed; explicit conflicts still stop a non-compliant lineup.</p>
         </section>
       </div>
 
@@ -1547,7 +1557,7 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
               <label><span>Weight (kg)</span><input min="35" onChange={(event) => setEditing({ ...editing, weightKg: asNumber(event.target.value) })} placeholder="Unknown" step="0.1" type="number" value={editing.weightKg ?? ""} /></label>
               <label><span>Preferred position</span><select onChange={(event) => setEditing({ ...editing, preferredPosition: event.target.value as Position })} value={editing.preferredPosition}><option>Any</option><option>Front</option><option>Middle</option><option>Back</option></select></label>
               <label><span>Current session role</span><select onChange={(event) => setEditing({ ...editing, sessionRole: event.target.value as SessionRole })} value={editing.sessionRole}><option>Paddler</option><option>Steer</option><option>Drummer</option><option>Unavailable</option></select></label>
-              <label><span>Event eligibility</span><select onChange={(event) => setEditing({ ...editing, eventEligibility: event.target.value as EventEligibility })} value={editing.eventEligibility}><option>Unconfirmed</option><option>Open</option><option>Mixed</option><option>Women</option><option>Ineligible</option></select></label>
+              <label><span>Event eligibility</span><select onChange={(event) => setEditing({ ...editing, eventEligibility: event.target.value as EventEligibility })} value={editing.eventEligibility}><option value="Unconfirmed">Not checked yet</option><option value="Open">Open</option><option value="Mixed">Mixed</option><option value="Women">Women-eligible</option><option value="Ineligible">Ineligible for this event</option></select></label>
               <label><span>Gender (optional; not used for eligibility)</span><select onChange={(event) => setEditing({ ...editing, gender: event.target.value as Gender })} value={editing.gender}><option value="Unknown">Unknown</option><option value="F">Woman / F</option><option value="M">Man / M</option><option value="X">Another category / X</option></select></label>
               <label><span>Experience</span><select onChange={(event) => setEditing({ ...editing, experience: event.target.value as Experience })} value={editing.experience}><option>Unknown</option><option>Developing</option><option>Experienced</option><option>Pacer</option><option>Steer</option></select></label>
               <fieldset className="role-eligibility wide"><legend>Eligible roles</legend>{(["Paddler", "Steer", "Drummer"] as SessionRole[]).map((role) => <label key={role}><input checked={editing.eligibleRoles.includes(role)} onChange={(event) => setEditing({ ...editing, eligibleRoles: event.target.checked ? [...new Set([...editing.eligibleRoles, role])] : editing.eligibleRoles.filter((item) => item !== role) })} type="checkbox" /><span>{role}</span></label>)}</fieldset>

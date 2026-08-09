@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateTrim, evidenceConfidence, replaceOneSeat, validateSeatAssignments } from "../app/boat-intelligence-core.ts";
+import { calculateTrim, evaluateEventEligibility, evidenceConfidence, replaceOneSeat, validateSeatAssignments } from "../app/boat-intelligence-core.ts";
 import { DATA_SCHEMA_VERSION, mergeSession, migrateLegacySession, parseSessionStore, validateBackupData } from "../app/session-store.ts";
 
 const paddler = (id, patch = {}) => ({
@@ -93,6 +93,24 @@ test("dockside replacement changes exactly one seat and preserves all others", (
   assert.equal(next[0].leftId, "a");
   assert.deepEqual(next[1], seats[1]);
   assert.deepEqual(seats[0], { row: 1, active: true, leftId: "a", rightId: "b" });
+});
+
+test("unconfirmed event eligibility remains buildable but provisional", () => {
+  const mixed = evaluateEventEligibility(["Women", "Women", "Unconfirmed", "Unconfirmed", "Open", "Open"], "mixed");
+  assert.equal(mixed.allowed, true);
+  assert.equal(mixed.provisional, true);
+  assert.equal(mixed.requiredWomen, 3);
+
+  const women = evaluateEventEligibility(["Women", "Unconfirmed", "Unconfirmed"], "women");
+  assert.equal(women.allowed, true);
+  assert.equal(women.provisional, true);
+});
+
+test("training ignores event eligibility while explicit event conflicts remain blocked", () => {
+  assert.equal(evaluateEventEligibility(["Ineligible", "Unconfirmed"], "count").allowed, true);
+  assert.equal(evaluateEventEligibility(["Women", "Open", "Unconfirmed"], "women").allowed, false);
+  assert.equal(evaluateEventEligibility(["Women", "Open", "Open", "Open"], "mixed").allowed, false);
+  assert.equal(evaluateEventEligibility(["Women", "Women", "Ineligible", "Unconfirmed"], "mixed").allowed, false);
 });
 
 test("one-to-four boat assignment sets remain duplicate-free", () => {

@@ -35,6 +35,8 @@ The boat planner treats recorded safety, side, availability, event-eligibility, 
 - Balanced and strongest-first objectives obey the same hard constraints.
 - Steer and drummer assignments sit outside the 20 paddling seats.
 - Event eligibility is stored separately from gender identity.
+- Unconfirmed eligibility is treated as missing information, not ineligibility: training boats remain unrestricted and event boats may be generated provisionally with visible confirmation warnings.
+- Explicit event conflicts still block a non-compliant event lineup.
 - Missing ratings are unknown; they are not converted into an average score.
 - Rating date and evidence confidence affect the displayed data-confidence level.
 - Recommendation quality, data confidence, constraint status, section profile, and trim confidence are shown separately.

@@ -56,6 +56,8 @@ test("Release 3 keeps hard constraints separate from optimization", () => {
   assert.match(boats, /data confidence/);
   assert.match(boats, /Dockside change/);
   assert.match(boats, /current paddler profiles/i);
+  assert.match(boats, /Unconfirmed eligibility does not block boat creation/);
+  assert.match(boats, /allowed provisionally/);
 });
 
 test("Release 1/2 hardening uses unified sessions and validated backups", () => {
