@@ -69,3 +69,12 @@ test("Release 1/2 hardening uses unified sessions and validated backups", () => 
   assert.match(page, /consecutive sessions/);
   assert.match(page, /drillEffectiveness/);
 });
+
+test("crew print is explicitly weight-free and coach details stay coach-only", () => {
+  assert.match(boats, /Lineup only — no weights/);
+  assert.match(boats, /Crew lineup · no weights/);
+  assert.match(boats, /Assignments only — no weights or private coaching information/);
+  assert.match(boats, /printVariant === "coach" && left && <small>\{left\.weightKg/);
+  assert.match(boats, /printVariant === "coach" && right && <small>\{right\.weightKg/);
+  assert.match(boats, /printVariant === "coach" && <div className="coach-print-summary">/);
+});

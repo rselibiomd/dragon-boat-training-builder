@@ -4639,6 +4639,28 @@ input[type="range"] {
     padding: 0.05in 0.09in;
   }
 
+  .crew-print-privacy {
+    align-items: center;
+    background: #edf7f1;
+    border-left: 3px solid #27835a;
+    color: #23483a;
+    display: flex;
+    gap: 0.1in;
+    min-height: 0.31in;
+    padding: 0.05in 0.09in;
+  }
+
+  .crew-print-privacy b {
+    color: #1e704b;
+    font-size: 6.2pt;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .crew-print-privacy span {
+    font-size: 7.2pt;
+  }
+
   .boat-print-note b {
     color: #c93038;
     font-size: 6.2pt;

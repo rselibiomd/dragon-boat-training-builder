@@ -1581,7 +1581,7 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
               <label className="print-notes-field"><span>Print notes (optional)</span><input onChange={(event) => setPrintNotes(event.target.value)} placeholder="Race, crew call, lane, conditions…" value={printNotes} /></label>
             </div>
             <div className="print-choice-grid">
-              <button onClick={() => printBoatPlan("crew")} type="button"><span className="print-choice-icon">♙</span><strong>Crew-safe boat card</strong><small>Names, rows, left/right positions, spares, and your print note. No private ratings or weights.</small><b>Print crew version →</b></button>
+              <button onClick={() => printBoatPlan("crew")} type="button"><span className="print-choice-icon">♙</span><strong>Lineup only — no weights</strong><small>Names, rows, left/right positions, steer, drummer, spares, date, and your print note. No weights or private coaching data.</small><b>Print no-weight lineup →</b></button>
               <button onClick={() => printBoatPlan("coach")} type="button"><span className="print-choice-icon">◎</span><strong>Coach-detail boat card</strong><small>Adds weight, side preference, rating summary, section profile, and lineup warnings.</small><b>Print coach version →</b></button>
             </div>
             <p className="print-dialog-note">Each boat prints on its own landscape Letter page using a top-down dragon boat layout.</p>
@@ -1601,9 +1601,10 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
             return <article className="print-boat-sheet" key={boat.id}>
               <header className="print-brand-header">
                 <img src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/kdbc-logo.jpeg`} alt="Kingston Dragon Boat Club" />
-                <div><span>{printVariant === "coach" ? "Coach-detail lineup" : "Crew boat card"}</span><strong>Boat {boatIndex + 1} of {boats.length}</strong></div>
+                <div><span>{printVariant === "coach" ? "Coach-detail lineup" : "Crew lineup · no weights"}</span><strong>Boat {boatIndex + 1} of {boats.length}</strong></div>
               </header>
               <div className="boat-print-title"><div><p>{strategyText}{rebuildNeeded ? " · rebuild recommended" : ""} · {members.length} paddlers</p><h1>{lineupName} · {boat.name}</h1></div><div><span>Lineup date</span><strong>{printDate || "Not set"}</strong></div></div>
+              {printVariant === "crew" && <div className="crew-print-privacy"><b>Crew-facing copy</b><span>Assignments only — no weights or private coaching information</span></div>}
               {printNotes && <div className="boat-print-note"><b>Coach note</b><span>{printNotes}</span></div>}
               <div className="boat-officials"><span><b>Steer</b>{boat.steerId ? paddlerMap.get(boat.steerId)?.name : "Unassigned"}</span><span><b>Drummer</b>{boat.drummerId ? paddlerMap.get(boat.drummerId)?.name : "Unassigned"}</span></div>
 
