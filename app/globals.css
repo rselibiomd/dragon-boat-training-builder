@@ -4191,7 +4191,13 @@ input[type="range"] {
 @media (max-width: 720px) {
   .substitution-panel,
   .trim-analysis,
-  .constraint-editor { grid-template-colu
+  .constraint-editor { grid-template-columns: 1fr; }
+  .substitution-panel > *,
+  .constraint-editor > * { grid-column: 1 !important; }
+  .boat-role-assignments { grid-template-columns: 1fr; }
+  .review-history article { align-items: stretch; flex-direction: column; }
+}
+
 /* Theme integrity overrides
    Keep this block after every screen component rule so late-added sections cannot
    fall back to light-only backgrounds or low-contrast text. Print rules follow. */
