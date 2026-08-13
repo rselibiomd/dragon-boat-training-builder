@@ -14,6 +14,11 @@
   --coral: #ff484f;
   --coral-dark: #ea343d;
   --blue-soft: #edf6fd;
+  /* Compatibility aliases used by the newer coaching and substitution panels. */
+  --text: var(--ink);
+  --input: var(--surface);
+  --accent: var(--coral);
+  --surface-soft: color-mix(in srgb, var(--surface) 88%, var(--canvas));
 }
 
 * {
@@ -4186,11 +4191,204 @@ input[type="range"] {
 @media (max-width: 720px) {
   .substitution-panel,
   .trim-analysis,
-  .constraint-editor { grid-template-columns: 1fr; }
-  .substitution-panel > *,
-  .constraint-editor > * { grid-column: 1 !important; }
-  .boat-role-assignments { grid-template-columns: 1fr; }
-  .review-history article { align-items: stretch; flex-direction: column; }
+  .constraint-editor { grid-template-colu
+/* Theme integrity overrides
+   Keep this block after every screen component rule so late-added sections cannot
+   fall back to light-only backgrounds or low-contrast text. Print rules follow. */
+@media screen {
+  .app-shell.theme-dark :where(
+    .display-switcher-wrap,
+    .control-card,
+    .festival-card,
+    .summary-card,
+    .full-plan,
+    .emphasis-panel,
+    .detail-card,
+    .setup-card,
+    .spares-card,
+    .boat-card,
+    .ratings-editor,
+    .interval-builder,
+    .diagnostic-panel,
+    .next-practice-panel,
+    .practice-review,
+    .substitution-panel,
+    .constraint-editor,
+    .trim-analysis > div,
+    .review-history article,
+    .saved-list-manage article,
+    .print-dialog,
+    .library-drawer,
+    .roster-drawer,
+    .edit-drawer
+  ) {
+    background: #0b2234;
+    border-color: #365267;
+    color: #eef5f9;
+  }
+
+  .app-shell.theme-dark :where(
+    .display-switcher,
+    .theme-picker,
+    .roster-stat-row > div,
+    .boat-count-row button,
+    .strategy-toggle,
+    .saved-list button,
+    .roster-list article,
+    .bench-paddlers button,
+    .print-choice-grid > button,
+    .phase-ladder button
+  ) {
+    background: #0f2b40;
+    border-color: #365267;
+  }
+
+  .app-shell.theme-dark :where(
+    .plan-actions button,
+    .detail-title button,
+    .setup-actions button,
+    .file-button,
+    .import-empty button,
+    .lineup-actions button,
+    .roster-bulk-actions button,
+    .saved-list-manage article > div button,
+    .session-identity > button,
+    .substitution-actions button,
+    .review-cancel,
+    .review-history button
+  ) {
+    background: #102c42;
+    border-color: #45647a;
+    color: #eef5f9;
+  }
+
+  .app-shell.theme-dark :where(
+    .session-identity input,
+    .interval-grid input,
+    .interval-grid select,
+    .stop-condition input,
+    .diagnostic-panel select,
+    .review-grid input,
+    .review-grid select,
+    .rating-evidence input,
+    .rating-evidence select,
+    .substitution-panel select,
+    .boat-role-assignments select,
+    .constraint-editor select,
+    .constraint-editor input,
+    .print-meta-fields input
+  ) {
+    background: #0d283d;
+    border-color: #45647a;
+    color: #eef5f9;
+    color-scheme: dark;
+  }
+
+  .app-shell.theme-dark :where(
+    .detail-title h3,
+    .detail-grid p,
+    .cue-list span,
+    .interval-builder h2,
+    .diagnostic-panel h3,
+    .next-practice-panel h3,
+    .review-heading h2,
+    .rating-rubric summary,
+    .trim-analysis strong,
+    .review-history h3
+  ) {
+    color: #eef5f9;
+  }
+
+  .app-shell.theme-dark :where(
+    .detail-title p,
+    .detail-grid h4,
+    .cue-list > strong,
+    .display-switcher button small,
+    .print-choice-grid small,
+    .trim-analysis span,
+    .trim-analysis small,
+    .review-history article span,
+    .review-history article small
+  ) {
+    color: #a8bdca;
+  }
+
+  .app-shell.theme-dark .display-switcher button small {
+    color: #849eaf;
+  }
+
+  .app-shell.theme-dark .range-labels {
+    color: #91a8b9;
+  }
+
+  .app-shell.theme-dark .cue-list span {
+    background: #16364e;
+  }
+
+  .app-shell.theme-dark :where(.logic-card, .planner-truth, .diagnostic-result) {
+    background: #102c42;
+    border-color: #45647a;
+  }
+
+  .app-shell.theme-dark :where(.logic-card p, .planner-truth p, .diagnostic-result p) {
+    color: #b5c7d2;
+  }
+
+  .app-shell.theme-dark :where(.logic-card span, .diagnostic-result > span, .diagnostic-result > b) {
+    color: #ff9a9f;
+  }
+
+  .app-shell.theme-dark .boat-checks {
+    background: #12382f;
+    border-color: #2a6853;
+    color: #b9ead2;
+  }
+
+  .app-shell.theme-dark .boat-checks.has-warnings {
+    background: #42331a;
+    border-color: #715a2c;
+    color: #f5d99a;
+  }
+
+  .app-shell.theme-dark .total-row > span {
+    background: #16364e;
+    color: #ff9297;
+  }
+
+  .theme-neo .data-actions :where(button, label) {
+    background: #ffffff;
+    border-color: #c8cbd0;
+    color: #33373c;
+  }
+
+  .theme-neo .display-switcher button small {
+    color: #59626a;
+  }
+
+  .theme-neo :where(.privacy-card, .planner-build-row, .notes-card, .boat-card > header) {
+    color: #ffffff;
+  }
+
+  .theme-neo :where(
+    .privacy-card p,
+    .privacy-card small,
+    .planner-build-row p,
+    .planner-build-row small,
+    .notes-card small,
+    .boat-card > header p,
+    .boat-card > header small
+  ) {
+    color: #c5c9d0;
+  }
+
+  .theme-neo .notes-card .eyebrow {
+    color: #aebfff;
+  }
+
+  .app-shell :where(button, select, input, textarea, summary):focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--coral) 72%, white);
+    outline-offset: 2px;
+  }
 }
 
 @media print {
