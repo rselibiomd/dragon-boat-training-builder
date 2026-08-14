@@ -377,33 +377,11 @@ function paddlerDataConfidence(paddler: Paddler) {
   return Math.round((ratingCoverageScore * ratingEvidenceFactor(paddler) * 0.8 + profileCoverage * 0.2) * 100);
 }
 
-function activeRows(pairCount: number) {
-  if (pairCount <= 0) return [];
-  if (pairCount === 1) return [5];
-  const rows = Array.from({ length: pairCount }, (_, index) => Math.round(1 + (index * 9) / (pairCount - 1)));
-  return [...new Set(rows)].slice(0, pairCount);
-}
-
-function activeRowsWithLocks(pairCount: number, lockedSeats: Seat[] | undefined, groupIds: Set<string>) {
-  const lockedRows = (lockedSeats ?? [])
-    .filter((seat) => (seat.leftLocked && seat.leftId && groupIds.has(seat.leftId)) || (seat.rightLocked && seat.rightId && groupIds.has(seat.rightId)))
-    .map((seat) => seat.row);
-  const uniqueLockedRows = [...new Set(lockedRows)];
-  if (uniqueLockedRows.length > pairCount) {
-    throw new Error("There are more locked seat rows than the selected crew size. Unlock a row or add participating paddlers.");
-  }
-  const result = [...uniqueLockedRows];
-  [...activeRows(pairCount), ...Array.from({ length: 10 }, (_, index) => index + 1)].forEach((row) => {
-    if (result.length < pairCount && !result.includes(row)) result.push(row);
-  });
-  return result.sort((a, b) => a - b);
-}
-
 function targetBoatSizes(totalPaddlers: number, boatCount: number) {
-  const totalPairs = Math.min(Math.floor(totalPaddlers / 2), boatCount * 10);
-  const base = Math.floor(totalPairs / boatCount);
-  const extra = totalPairs % boatCount;
-  return Array.from({ length: boatCount }, (_, index) => (base + (index < extra ? 1 : 0)) * 2);
+  const seatedPaddlers = Math.min(totalPaddlers, boatCount * 20);
+  const base = Math.floor(seatedPaddlers / boatCount);
+  const extra = seatedPaddlers % boatCount;
+  return Array.from({ length: boatCount }, (_, index) => base + (index < extra ? 1 : 0));
 }
 
 function zoneForRow(row: number): Position {
@@ -449,20 +427,18 @@ function candidateScore(paddler: Paddler, side: "L" | "R", row: number, pairMate
   return score;
 }
 
-function buildSeats(group: Paddler[], pairCount: number, lockedSeats?: Seat[]) {
+function buildSeats(group: Paddler[], lockedSeats?: Seat[]) {
   const groupIds = new Set(group.map((paddler) => paddler.id));
-  const rows = activeRowsWithLocks(pairCount, lockedSeats, groupIds);
   const preservedIds = new Set<string>();
   const seats: Seat[] = Array.from({ length: 10 }, (_, index) => {
     const old = lockedSeats?.find((seat) => seat.row === index + 1);
-    const active = rows.includes(index + 1);
-    const preserveLeft = Boolean(active && old?.leftLocked && old.leftId && groupIds.has(old.leftId) && !preservedIds.has(old.leftId));
+    const preserveLeft = Boolean(old?.leftLocked && old.leftId && groupIds.has(old.leftId) && !preservedIds.has(old.leftId));
     if (preserveLeft && old?.leftId) preservedIds.add(old.leftId);
-    const preserveRight = Boolean(active && old?.rightLocked && old.rightId && groupIds.has(old.rightId) && !preservedIds.has(old.rightId));
+    const preserveRight = Boolean(old?.rightLocked && old.rightId && groupIds.has(old.rightId) && !preservedIds.has(old.rightId));
     if (preserveRight && old?.rightId) preservedIds.add(old.rightId);
     return {
       row: index + 1,
-      active,
+      active: true,
       leftId: preserveLeft ? old?.leftId ?? null : null,
       rightId: preserveRight ? old?.rightId ?? null : null,
       leftLocked: preserveLeft,
@@ -474,7 +450,7 @@ function buildSeats(group: Paddler[], pairCount: number, lockedSeats?: Seat[]) {
   const knownWeights = group.map((paddler) => paddler.weightKg).filter((value): value is number => value !== null);
   const averageWeight = knownWeights.length ? knownWeights.reduce((sum, value) => sum + value, 0) / knownWeights.length : 0;
 
-  seats.filter((seat) => seat.active).forEach((seat) => {
+  seats.forEach((seat) => {
     (["L", "R"] as const).forEach((side) => {
       const key = side === "L" ? "leftId" : "rightId";
       if (seat[key]) return;
@@ -542,7 +518,6 @@ function createBoats(paddlers: Paddler[], boatCount: number, strategy: Strategy,
   const steers = paddlers.filter((paddler) => paddler.participating && paddler.sessionRole === "Steer");
   const drummers = paddlers.filter((paddler) => paddler.participating && paddler.sessionRole === "Drummer");
   const sizes = targetBoatSizes(attending.length, boatCount);
-  if (sizes.some((size) => size < 10)) throw new Error(`You need at least ${boatCount * 10} participating paddlers for ${boatCount} boats.`);
   const eventEligibility = evaluateEventEligibility(attending.map((paddler) => paddler.eventEligibility), compositionRule);
   if (!eventEligibility.allowed && compositionRule === "women") {
     const incompatible = attending.filter((paddler) => !["Women", "Unconfirmed"].includes(paddler.eventEligibility));
@@ -607,7 +582,7 @@ function createBoats(paddlers: Paddler[], boatCount: number, strategy: Strategy,
     const boat: Boat = {
       id: old?.id ?? `boat-${Date.now()}-${index}`,
       name: `Boat ${index + 1}`,
-      seats: buildSeats(group, Math.floor(sizes[index] / 2), old?.seats),
+      seats: buildSeats(group, old?.seats),
       steerId: old?.steerId && steers.some((paddler) => paddler.id === old.steerId) ? old.steerId : steers[index]?.id ?? null,
       drummerId: old?.drummerId && drummers.some((paddler) => paddler.id === old.drummerId) ? old.drummerId : drummers[index]?.id ?? null,
       warnings: [],
@@ -707,6 +682,17 @@ const DRAFT_KEY = "kdbc-boat-draft-v1";
 function normalizeBoats(raw: Boat[]) {
   return (Array.isArray(raw) ? raw : []).map((boat) => ({
     ...boat,
+    seats: Array.from({ length: 10 }, (_, index) => {
+      const saved = Array.isArray(boat.seats) ? boat.seats.find((seat) => seat.row === index + 1) : undefined;
+      return {
+        row: index + 1,
+        active: true,
+        leftId: saved?.leftId ?? null,
+        rightId: saved?.rightId ?? null,
+        leftLocked: Boolean(saved?.leftLocked),
+        rightLocked: Boolean(saved?.rightLocked),
+      };
+    }),
     steerId: boat.steerId ?? null,
     drummerId: boat.drummerId ?? null,
     warnings: Array.isArray(boat.warnings) ? boat.warnings : [],
@@ -1298,7 +1284,7 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
 
   const assignedPaddlers = [...new Set(boats.flatMap((boat) => boat.seats.flatMap((seat) => [seat.leftId, seat.rightId])).filter(Boolean) as string[])];
   const selectablePaddlers = [...participating].sort((a, b) => a.name.localeCompare(b.name));
-  const plannedSeats = Math.min(Math.floor(participating.length / 2) * 2, boatCount * 20);
+  const plannedSeats = Math.min(participating.length, boatCount * 20);
   const potentialSpares = Math.max(0, participating.length - plannedSeats);
   const printedStrategy = lineupSnapshot?.strategy ?? strategy;
   const strategyText = printedStrategy === "balanced" ? "Balanced boats" : "Strongest-first";
@@ -1312,7 +1298,7 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
         <div>
           <p className="eyebrow">Boat planning console</p>
           <h1>Build the boats, then coach the crew.</h1>
-          <p>Import attendance, apply your coaching ratings, and generate 1–4 complete-pair lineups without surrendering coaching judgment.</p>
+          <p>Import attendance, apply your coaching ratings, and generate 1–4 complete 10-row lineups without surrendering coaching judgment.</p>
           <div className="active-session-chip"><span>Active session</span><strong>{sessionTitle}</strong><small>{sessionDate || "Date not set"}</small></div>
         </div>
         <div className="privacy-card"><span aria-hidden="true">⌂</span><div><strong>Device-only roster</strong><p>Names, weights, ratings, and saved lineups stay in this browser. Nothing is uploaded to the public site.</p></div></div>
@@ -1363,7 +1349,7 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
             {[1, 2, 3, 4].map((count) => <button className={boatCount === count ? "active" : ""} key={count} onClick={() => changeBoatCount(count)} type="button"><strong>{count}</strong><small>{count === 1 ? "boat" : "boats"}</small></button>)}
           </div>
           <label className="planner-field"><span>Lineup name</span><input onChange={(event) => setLineupName(event.target.value)} value={lineupName} /></label>
-          <p className="capacity-note">Requires at least {boatCount * 10} paddlers; maximum {boatCount * 20}. Odd or excess paddlers become spares.</p>
+          <p className="capacity-note">Every boat keeps rows 1–10. Smaller crews leave seats vacant; each boat holds up to 20 paddlers.</p>
         </section>
 
         <section className="setup-card">
@@ -1406,34 +1392,36 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
             {changedPaddlerIds.length > 0 && <p className="substitution-summary">Revised lineup: {changedPaddlerIds.map((id) => paddlerMap.get(id)?.name).filter(Boolean).join(" → ")}. All other seats are unchanged.</p>}
           </section>
 
-          <div
-            className={`spares-card roster-bench ${dropTarget === "bench" ? "drop-target" : ""}`}
-            data-drop-bench
-            onDragEnter={(event) => { event.preventDefault(); setDropTarget("bench"); }}
-            onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropTarget(""); }}
-            onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
-            onDrop={(event) => { event.preventDefault(); const paddlerId = event.dataTransfer.getData("text/plain") || draggingId; if (paddlerId) movePaddlerToBench(paddlerId); endDrag(); }}
-          >
-            <div><span>Roster bench</span><strong>{spares.length}</strong><small>Drag into a seat</small></div>
-            <div className="bench-paddlers">
-              {spares.length ? spares.map((paddler) => <button
-                className={draggingId === paddler.id ? "is-dragging" : ""}
-                draggable
-                key={paddler.id}
-                onDragEnd={endDrag}
-                onDragStart={(event) => beginNativeDrag(event, paddler.id)}
-                onPointerCancel={endDrag}
-                onPointerDown={(event) => beginTouchDrag(event, paddler.id)}
-                onPointerMove={moveTouchDrag}
-                onPointerUp={finishTouchDrag}
-                title={`${paddler.sideExclusive ? `${paddler.sidePref} only` : `${paddler.sidePref} preferred`}${paddler.weightKg ? ` · ${paddler.weightKg} kg` : ""}`}
-                type="button"
-              ><b>⠿</b><span>{paddler.name}</span><small>{paddler.sideExclusive ? `${paddler.sidePref} only` : `Pref ${paddler.sidePref}`}</small></button>) : <p>Everyone is seated. Drag a paddler here to create a vacancy.</p>}
+          <div className="lineup-workspace">
+            <div
+              aria-label="Paddlers ready to be seated"
+              className={`spares-card roster-bench ${dropTarget === "bench" ? "drop-target" : ""}`}
+              data-drop-bench
+              onDragEnter={(event) => { event.preventDefault(); setDropTarget("bench"); }}
+              onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropTarget(""); }}
+              onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
+              onDrop={(event) => { event.preventDefault(); const paddlerId = event.dataTransfer.getData("text/plain") || draggingId; if (paddlerId) movePaddlerToBench(paddlerId); endDrag(); }}
+            >
+              <div><span>Ready to seat</span><strong>{spares.length}</strong><small>Drag a paddler into the boat</small></div>
+              <div className="bench-paddlers">
+                {spares.length ? spares.map((paddler) => <button
+                  className={draggingId === paddler.id ? "is-dragging" : ""}
+                  draggable
+                  key={paddler.id}
+                  onDragEnd={endDrag}
+                  onDragStart={(event) => beginNativeDrag(event, paddler.id)}
+                  onPointerCancel={endDrag}
+                  onPointerDown={(event) => beginTouchDrag(event, paddler.id)}
+                  onPointerMove={moveTouchDrag}
+                  onPointerUp={finishTouchDrag}
+                  title={`${paddler.sideExclusive ? `${paddler.sidePref} only` : `${paddler.sidePref} preferred`}${paddler.weightKg ? ` · ${paddler.weightKg} kg` : ""}`}
+                  type="button"
+                ><b>⠿</b><span>{paddler.name}</span><small>{paddler.sideExclusive ? `${paddler.sidePref} only` : `Pref ${paddler.sidePref}`}</small></button>) : <p>Everyone is seated. Remove a paddler from a seat to return them here.</p>}
+              </div>
             </div>
-          </div>
 
-          <div className={`boats-grid boats-${boats.length}`}>
-            {boats.map((boat, boatIndex) => {
+            <div className={`boats-grid boats-${boats.length}`}>
+              {boats.map((boat, boatIndex) => {
               const ids = boat.seats.flatMap((seat) => [seat.leftId, seat.rightId]).filter(Boolean) as string[];
               const members = ids.map((id) => paddlerMap.get(id)).filter(Boolean) as Paddler[];
               const womenEligible = members.filter((paddler) => paddler.eventEligibility === "Women").length;
@@ -1499,7 +1487,10 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
                             >⠿</button>}
                             <select aria-label={`Row ${seat.row} ${side} paddler`} onChange={(event) => swapSeat(boatIndex, rowIndex, side, event.target.value)} value={id ?? ""}><option value="">Unassigned</option>{selectablePaddlers.map((item) => <option key={item.id} value={item.id}>{item.name}{assignedPaddlers.includes(item.id) ? "" : " · bench"}</option>)}</select>
                             <small>{paddler ? `${paddler.sideExclusive ? "Only " : "Pref "}${paddler.sidePref} · ${paddler.weightKg ? `${paddler.weightKg} kg` : "weight ?"}` : "Drop paddler here"}</small>
-                            {paddler && <details className="seat-reason"><summary>Why this seat?</summary><p>{seatReason(paddler, seat, side === "left" ? "L" : "R")}</p></details>}
+                            {paddler && <div className="seat-card-actions">
+                              <button aria-label={`Remove ${paddler.name} from row ${seat.row} ${side}`} className="seat-remove" onClick={() => movePaddlerToBench(paddler.id)} title={`Remove ${paddler.name} from this seat`} type="button">Remove</button>
+                              <details className="seat-reason"><summary>Why this seat?</summary><p>{seatReason(paddler, seat, side === "left" ? "L" : "R")}</p></details>
+                            </div>}
                           </div>;
                         })}
                         <div className="row-number" style={{ order: 1 }}><strong>{seat.row}</strong><span>{zoneForRow(seat.row)}</span></div>
@@ -1512,7 +1503,8 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
                   <div className={`boat-checks ${boat.warnings.length ? "has-warnings" : ""}`}><strong>{boat.warnings.length ? `${boat.warnings.length} check${boat.warnings.length === 1 ? "" : "s"}` : "No major flags"}</strong>{boat.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div>
                 </article>
               );
-            })}
+              })}
+            </div>
           </div>
           <div className="planner-truth"><strong>Coach check</strong><p>The optimizer enforces recorded constraints first, then improves section strength and trim. It cannot replace an on-water hull check or information that has not been entered; unresolved conflicts remain visible for coach judgment.</p></div>
         </section>

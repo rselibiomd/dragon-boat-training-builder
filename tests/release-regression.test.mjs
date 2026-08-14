@@ -78,3 +78,23 @@ test("crew print is explicitly weight-free and coach details stay coach-only", (
   assert.match(boats, /printVariant === "coach" && right && <small>\{right\.weightKg/);
   assert.match(boats, /printVariant === "coach" && <div className="coach-print-summary">/);
 });
+
+test("desktop seating keeps the available paddlers at left and supports one-click removal", async () => {
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(boats, /className="lineup-workspace"/);
+  assert.match(boats, /aria-label="Paddlers ready to be seated"/);
+  assert.match(boats, /className="seat-remove"/);
+  assert.match(boats, /onClick=\{\(\) => movePaddlerToBench\(paddler\.id\)\}/);
+  assert.match(styles, /grid-template-columns: minmax\(220px, 270px\) minmax\(0, 1fr\)/);
+  assert.match(styles, /\.lineup-workspace \.roster-bench[\s\S]*position: sticky/);
+});
+
+test("every generated boat keeps ten consecutive usable rows for smaller crews", () => {
+  assert.match(boats, /const seatedPaddlers = Math\.min\(totalPaddlers, boatCount \* 20\)/);
+  assert.match(boats, /const seats: Seat\[\] = Array\.from\(\{ length: 10 \}/);
+  assert.match(boats, /row: index \+ 1,\s*active: true/);
+  assert.match(boats, /seats\.forEach\(\(seat\) =>/);
+  assert.match(boats, /Every boat keeps rows 1–10\. Smaller crews leave seats vacant/);
+  assert.doesNotMatch(boats, /function activeRows\(/);
+  assert.doesNotMatch(boats, /You need at least \$\{boatCount \* 10\} participating paddlers/);
+});
