@@ -2274,7 +2274,7 @@ input[type="range"] {
     background: #0b2234;
   }
 
-  .theme-dark :where(.display-switcher, .theme-picker, .roster-stat-row > div, .boat-count-row button, .strategy-toggle, .ratings-editor, .saved-list button, .roster-list article, .bench-paddlers button, .print-choice-grid > button) {
+  .theme-dark :where(.display-switcher, .theme-picker, .roster-stat-row > div, .boat-count-row button, .strategy-toggle, .ratings-editor, .saved-list button, .roster-list article, .bench-paddlers button, .print-choice-card) {
     background: #0f2b40;
     border-color: #2c475a;
   }
@@ -2314,7 +2314,8 @@ input[type="range"] {
   .theme-dark .roster-bulk-actions button,
   .theme-dark .roster-list article > button,
   .theme-dark .bench-paddlers button,
-  .theme-dark .print-choice-grid > button {
+  .theme-dark .print-choice-card,
+  .theme-dark .print-format-actions button {
     background: #102c42;
     border-color: #355267;
     color: #eef5f9;
@@ -3868,7 +3869,7 @@ input[type="range"] {
   margin-top: 18px;
 }
 
-.print-choice-grid > button {
+.print-choice-card {
   background: #f7fafc;
   border: 1px solid #d7e1e8;
   border-radius: 13px;
@@ -3880,7 +3881,7 @@ input[type="range"] {
   text-align: left;
 }
 
-.print-choice-grid > button:hover {
+.print-choice-card:hover {
   background: #eff7fc;
   border-color: #77aecd;
   box-shadow: inset 0 0 0 1px #77aecd;
@@ -3910,10 +3911,38 @@ input[type="range"] {
   margin: 7px 0 18px;
 }
 
-.print-choice-grid b {
-  color: var(--coral-dark);
-  font-size: 11px;
+.print-format-actions {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(3, 1fr);
   margin-top: auto;
+}
+
+.print-format-actions button {
+  background: #fff;
+  border: 1px solid #b9cbd7;
+  border-radius: 8px;
+  color: var(--navy-900);
+  font-size: 10px;
+  font-weight: 800;
+  min-height: 36px;
+  padding: 7px 6px;
+}
+
+.print-format-actions button:first-child {
+  background: var(--navy-900);
+  border-color: var(--navy-900);
+  color: #fff;
+}
+
+.print-format-actions button:hover:not(:disabled) {
+  border-color: var(--coral-dark);
+  color: var(--coral-dark);
+}
+
+.print-format-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .print-dialog-note {
@@ -3942,8 +3971,12 @@ input[type="range"] {
     grid-template-columns: 1fr;
   }
 
-  .print-choice-grid > button {
+  .print-choice-card {
     min-height: 170px;
+  }
+
+  .print-format-actions {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -4342,7 +4375,7 @@ input[type="range"] {
     .saved-list button,
     .roster-list article,
     .bench-paddlers button,
-    .print-choice-grid > button,
+    .print-choice-card,
     .phase-ladder button
   ) {
     background: #0f2b40;
@@ -4499,11 +4532,14 @@ input[type="range"] {
 
 @media print {
   html,
-  body {
+  body,
+  .app-shell {
     background: #fff !important;
     color: #102437;
     font-family: Arial, Helvetica, sans-serif;
+    height: auto !important;
     margin: 0 !important;
+    min-height: 0 !important;
     padding: 0 !important;
   }
 
@@ -4523,7 +4559,10 @@ input[type="range"] {
     display: block !important;
   }
 
-  .boat-planner-shell {
+  .boat-planner-shell,
+  .training-print-document,
+  .boat-print-document {
+    height: auto !important;
     margin: 0 !important;
     min-height: 0 !important;
     padding: 0 !important;
@@ -4537,9 +4576,31 @@ input[type="range"] {
     page: training;
   }
 
-  .boat-print-document,
-  .print-boat-sheet {
+  .boat-print-document {
     page: boat;
+  }
+
+  .training-print-page,
+  .print-boat-sheet {
+    box-sizing: border-box;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .training-print-page {
+    height: 10.22in;
+  }
+
+  .training-print-page:not(:last-child),
+  .print-boat-sheet:not(:last-child) {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .training-print-page:last-child,
+  .print-boat-sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
   }
 
   .print-brand-header {
@@ -4816,6 +4877,13 @@ input[type="range"] {
     padding-top: 0.06in;
   }
 
+  .training-print-page > .print-page-footer {
+    bottom: 0;
+    left: 0;
+    position: absolute;
+    right: 0;
+  }
+
   .training-detailed-plan .print-title-row {
     padding-top: 0.18in;
   }
@@ -4915,14 +4983,7 @@ input[type="range"] {
   }
 
   .print-boat-sheet {
-    break-after: page;
     height: 7.88in;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .print-boat-sheet:last-child {
-    break-after: auto;
   }
 
   .boat-print-title {

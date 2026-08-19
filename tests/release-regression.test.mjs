@@ -71,12 +71,27 @@ test("Release 1/2 hardening uses unified sessions and validated backups", () => 
 });
 
 test("crew print is explicitly weight-free and coach details stay coach-only", () => {
-  assert.match(boats, /Lineup only — no weights/);
+  assert.match(boats, /Lineup only, no weights/);
   assert.match(boats, /Crew lineup · no weights/);
   assert.match(boats, /Assignments only — no weights or private coaching information/);
   assert.match(boats, /printVariant === "coach" && left && <small>\{left\.weightKg/);
   assert.match(boats, /printVariant === "coach" && right && <small>\{right\.weightKg/);
   assert.match(boats, /printVariant === "coach" && <div className="coach-print-summary">/);
+});
+
+test("print and direct export formats share explicit page boundaries", async () => {
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const exportSource = await readFile(new URL("../app/print-export.ts", import.meta.url), "utf8");
+  assert.match(page, /Save PDF/);
+  assert.match(page, /Save PNG/);
+  assert.match(page, /pageSelector: "\.training-print-page"/);
+  assert.match(boats, /pageSelector: "\.print-boat-sheet"/);
+  assert.match(exportSource, /new jsPDF/);
+  assert.match(exportSource, /html2canvas/);
+  assert.match(styles, /\.training-print-page:not\(:last-child\),\s*\.print-boat-sheet:not\(:last-child\)/);
+  assert.match(styles, /page-break-after: always/);
+  assert.match(styles, /\.print-boat-sheet:last-child[\s\S]*page-break-after: auto/);
+  assert.doesNotMatch(styles, /\.print-boat-sheet\s*\{\s*break-after: page/);
 });
 
 test("desktop seating keeps the available paddlers at left and supports one-click removal", async () => {

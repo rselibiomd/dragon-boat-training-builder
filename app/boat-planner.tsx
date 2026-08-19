@@ -3,6 +3,7 @@
 import { ChangeEvent, DragEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { ConsoleTheme } from "./page";
 import { allocateBoatUnits, calculateTrim, evaluateEventEligibility, evidenceConfidence, validateSeatAssignments } from "./boat-intelligence-core";
+import type { PrintExportFormat } from "./print-export";
 import { updateSession } from "./session-store";
 
 type Side = "L" | "R" | "Either";
@@ -720,6 +721,7 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
   const [touchDrag, setTouchDrag] = useState<TouchDrag | null>(null);
   const [printOpen, setPrintOpen] = useState(false);
   const [printVariant, setPrintVariant] = useState<BoatPrintVariant | null>(null);
+  const [exportingPrint, setExportingPrint] = useState<PrintExportFormat | null>(null);
   const [printDate, setPrintDate] = useState(new Date().toISOString().slice(0, 10));
   const [printNotes, setPrintNotes] = useState("");
   const [boatDisplay, setBoatDisplay] = useState<BoatDisplay>("planner");
@@ -1282,6 +1284,27 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
     window.setTimeout(() => window.print(), 80);
   }
 
+  async function exportBoatPlan(variant: BoatPrintVariant, format: PrintExportFormat) {
+    if (exportingPrint) return;
+    setPrintVariant(variant);
+    setPrintOpen(false);
+    setExportingPrint(format);
+    try {
+      const { exportPrintPages } = await import("./print-export");
+      const pageCount = await exportPrintPages({
+        filename: `${lineupName}-${variant}`,
+        format,
+        orientation: "landscape",
+        pageSelector: ".print-boat-sheet",
+      });
+      showNotice(`${format.toUpperCase()} saved, ${pageCount} page${pageCount === 1 ? "" : "s"}`);
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : `Could not create the ${format.toUpperCase()}`);
+    } finally {
+      setExportingPrint(null);
+    }
+  }
+
   const assignedPaddlers = [...new Set(boats.flatMap((boat) => boat.seats.flatMap((seat) => [seat.leftId, seat.rightId])).filter(Boolean) as string[])];
   const selectablePaddlers = [...participating].sort((a, b) => a.name.localeCompare(b.name));
   const plannedSeats = Math.min(participating.length, boatCount * 20);
@@ -1573,10 +1596,10 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
               <label className="print-notes-field"><span>Print notes (optional)</span><input onChange={(event) => setPrintNotes(event.target.value)} placeholder="Race, crew call, lane, conditions…" value={printNotes} /></label>
             </div>
             <div className="print-choice-grid">
-              <button onClick={() => printBoatPlan("crew")} type="button"><span className="print-choice-icon">♙</span><strong>Lineup only — no weights</strong><small>Names, rows, left/right positions, steer, drummer, spares, date, and your print note. No weights or private coaching data.</small><b>Print no-weight lineup →</b></button>
-              <button onClick={() => printBoatPlan("coach")} type="button"><span className="print-choice-icon">◎</span><strong>Coach-detail boat card</strong><small>Adds weight, side preference, rating summary, section profile, and lineup warnings.</small><b>Print coach version →</b></button>
+              <article className="print-choice-card"><span className="print-choice-icon">♙</span><strong>Lineup only, no weights</strong><small>Names, rows, left/right positions, steer, drummer, spares, date, and your print note. No weights or private coaching data.</small><div className="print-format-actions"><button disabled={Boolean(exportingPrint)} onClick={() => printBoatPlan("crew")} type="button">Print</button><button disabled={Boolean(exportingPrint)} onClick={() => exportBoatPlan("crew", "pdf")} type="button">Save PDF</button><button disabled={Boolean(exportingPrint)} onClick={() => exportBoatPlan("crew", "png")} type="button">Save PNG</button></div></article>
+              <article className="print-choice-card"><span className="print-choice-icon">◎</span><strong>Coach-detail boat card</strong><small>Adds weight, side preference, rating summary, section profile, and lineup warnings.</small><div className="print-format-actions"><button disabled={Boolean(exportingPrint)} onClick={() => printBoatPlan("coach")} type="button">Print</button><button disabled={Boolean(exportingPrint)} onClick={() => exportBoatPlan("coach", "pdf")} type="button">Save PDF</button><button disabled={Boolean(exportingPrint)} onClick={() => exportBoatPlan("coach", "png")} type="button">Save PNG</button></div></article>
             </div>
-            <p className="print-dialog-note">Each boat prints on its own landscape Letter page using a top-down dragon boat layout.</p>
+            <p className="print-dialog-note">Each boat uses its own landscape Letter page. PDF creates one shareable document, PNG saves one image per boat.</p>
           </section>
         </div>
       )}
@@ -1630,7 +1653,8 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
         </section>
       )}
 
-      {notice && <div className="toast" role="status">✓ {notice}</div>}
+      {exportingPrint && <div className="toast export-toast" role="status">Preparing {exportingPrint.toUpperCase()}…</div>}
+      {!exportingPrint && notice && <div className="toast" role="status">✓ {notice}</div>}
       {touchDrag && <div className="touch-drag-preview" style={{ left: touchDrag.x, top: touchDrag.y }}>{paddlerMap.get(touchDrag.paddlerId)?.name ?? "Paddler"}</div>}
     </section>
   );

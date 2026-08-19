@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import BoatPlanner from "./boat-planner";
+import type { PrintExportFormat } from "./print-export";
 import { DATA_SCHEMA_VERSION, migrateLegacySession, newSessionId, updateSession, validateBackupData } from "./session-store";
 
 type Focus = "Stability" | "Technique" | "Endurance" | "Power" | "Speed";
@@ -585,6 +586,7 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [printOpen, setPrintOpen] = useState(false);
   const [printVariant, setPrintVariant] = useState<TrainingPrintVariant | null>(null);
+  const [exportingPrint, setExportingPrint] = useState<PrintExportFormat | null>(null);
   const [printTitle, setPrintTitle] = useState("Stability Practice");
   const [printDate, setPrintDate] = useState(new Date().toISOString().slice(0, 10));
   const [trainingDisplay, setTrainingDisplay] = useState<TrainingDisplay>("builder");
@@ -946,6 +948,27 @@ export default function Home() {
     window.setTimeout(() => window.print(), 80);
   }
 
+  async function exportTrainingPlan(variant: TrainingPrintVariant, format: PrintExportFormat) {
+    if (exportingPrint) return;
+    setPrintVariant(variant);
+    setPrintOpen(false);
+    setExportingPrint(format);
+    try {
+      const { exportPrintPages } = await import("./print-export");
+      const pageCount = await exportPrintPages({
+        filename: `${printTitle || `${focus} Practice`}-${variant}`,
+        format,
+        orientation: "portrait",
+        pageSelector: ".training-print-page",
+      });
+      showNotice(`${format.toUpperCase()} saved, ${pageCount} page${pageCount === 1 ? "" : "s"}`);
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : `Could not create the ${format.toUpperCase()}`);
+    } finally {
+      setExportingPrint(null);
+    }
+  }
+
   function changeTheme(nextTheme: ConsoleTheme) {
     setTheme(nextTheme);
     window.localStorage.setItem("kdbc-console-theme", nextTheme);
@@ -997,6 +1020,8 @@ export default function Home() {
     Object.keys(window.localStorage).filter((key) => key.startsWith("kdbc-") || key.startsWith("dragonboat-")).forEach((key) => window.localStorage.removeItem(key));
     window.location.reload();
   }
+
+  const detailedPrintPages = Array.from({ length: Math.ceil(session.length / 3) }, (_, pageIndex) => session.slice(pageIndex * 3, pageIndex * 3 + 3));
 
   return (
     <main className={`app-shell theme-${theme} training-display-${trainingDisplay}`}>
@@ -1232,23 +1257,22 @@ export default function Home() {
               <label><span>Practice date</span><input onChange={(event) => setPrintDate(event.target.value)} type="date" value={printDate} /></label>
             </div>
             <div className="print-choice-grid">
-              <button onClick={() => printTrainingPlan("run-sheet")} type="button"><span className="print-choice-icon">▤</span><strong>Dockside run sheet</strong><small>One portrait page with the timeline, executable sets, key cues, and note space.</small><b>Print one-page plan →</b></button>
-              <button onClick={() => printTrainingPlan("detailed")} type="button"><span className="print-choice-icon">▥</span><strong>Detailed coaching plan</strong><small>Full purpose, set instructions, coaching cues, and notes across as many pages as needed.</small><b>Print detailed plan →</b></button>
+              <article className="print-choice-card"><span className="print-choice-icon">▤</span><strong>Dockside run sheet</strong><small>One portrait page with the timeline, executable sets, key cues, and note space.</small><div className="print-format-actions"><button disabled={Boolean(exportingPrint)} onClick={() => printTrainingPlan("run-sheet")} type="button">Print</button><button disabled={Boolean(exportingPrint)} onClick={() => exportTrainingPlan("run-sheet", "pdf")} type="button">Save PDF</button><button disabled={Boolean(exportingPrint)} onClick={() => exportTrainingPlan("run-sheet", "png")} type="button">Save PNG</button></div></article>
+              <article className="print-choice-card"><span className="print-choice-icon">▥</span><strong>Detailed coaching plan</strong><small>Full purpose, set instructions, coaching cues, and notes across as many pages as needed.</small><div className="print-format-actions"><button disabled={Boolean(exportingPrint)} onClick={() => printTrainingPlan("detailed")} type="button">Print</button><button disabled={Boolean(exportingPrint)} onClick={() => exportTrainingPlan("detailed", "pdf")} type="button">Save PDF</button><button disabled={Boolean(exportingPrint)} onClick={() => exportTrainingPlan("detailed", "png")} type="button">Save PNG</button></div></article>
             </div>
-            <p className="print-dialog-note">Both formats are designed for US Letter paper and remain readable in black and white.</p>
+            <p className="print-dialog-note">Print or save directly. PDF creates one shareable document, PNG saves one image per page. Both use US Letter paper and remain readable in black and white.</p>
           </section>
         </div>
       )}
 
       {printVariant && (
         <section className={`print-document training-print-document training-print-${printVariant}`}>
-          <header className="print-brand-header">
-            <img src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/kdbc-logo.jpeg`} alt="Kingston Dragon Boat Club" />
-            <div><span>Training Plan</span><strong>Coach Tools</strong></div>
-          </header>
-
           {printVariant === "run-sheet" ? (
-            <article className="training-run-sheet">
+            <article className="training-print-page training-run-sheet">
+              <header className="print-brand-header">
+                <img src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/kdbc-logo.jpeg`} alt="Kingston Dragon Boat Club" />
+                <div><span>Training Plan</span><strong>Coach Tools</strong></div>
+              </header>
               <div className="print-title-row"><div><p>{crew} crew · {duration} minutes</p><h1>{printTitle || `${focus} Practice`}</h1></div><div><span>Practice date</span><strong>{printDate || "Not set"}</strong></div></div>
               <div className="print-session-strip"><span><b>Focus</b>{focus}</span><span><b>Emphasis</b>{emphasisLabel(emphasis)}</span><span><b>Festival</b>{festivalWeeks === 0 ? "Race day" : `${festivalWeeks} weeks`}</span><span><b>Total</b>{total} min</span></div>
               <div className="run-sheet-table">
@@ -1257,24 +1281,32 @@ export default function Home() {
               </div>
               <div className="print-coach-rule"><b>Coach&apos;s rule</b><span>{focusCopy[focus].cue}. Reset the set when the selected quality is lost.</span></div>
               <div className="print-notes-box"><b>On-water notes</b><p>{notes || ""}</p><span /><span /><span /></div>
+              <footer className="print-page-footer"><span>KDBC Coach Tools</span><span>{printTitle || `${focus} Practice`}</span></footer>
             </article>
           ) : (
-            <article className="training-detailed-plan">
-              <div className="print-title-row"><div><p>{crew} crew · {duration} minutes</p><h1>{printTitle || `${focus} Practice`}</h1></div><div><span>Practice date</span><strong>{printDate || "Not set"}</strong></div></div>
-              <div className="print-session-strip"><span><b>Focus</b>{focus}</span><span><b>Emphasis</b>{emphasisLabel(emphasis)}</span><span><b>Festival</b>{festivalWeeks === 0 ? "Race day" : `${festivalWeeks} weeks`}</span><span><b>Total</b>{total} min</span></div>
-              <section className="detailed-print-blocks">
-                {session.map((block, index) => <article className="detailed-print-card" key={block.id}><div className="detailed-print-number">{String(index + 1).padStart(2, "0")}</div><div><header><span>{block.minutes} minutes</span><h2>{block.name}</h2><p>{block.detail}</p></header><div className="detailed-print-grid"><section><b>Purpose</b><p>{block.objective}</p></section><section><b>Set</b><p>{block.set}</p></section></div><div className="detailed-print-cues"><b>Primary coach cue</b>{block.cues.slice(0, 1).map((cue) => <span key={cue}>{cue}</span>)}</div></div></article>)}
-              </section>
-              <div className="print-notes-box detailed-notes"><b>Coach&apos;s notes</b><p>{notes || ""}</p><span /><span /><span /></div>
-            </article>
+            detailedPrintPages.map((blocks, pageIndex) => (
+              <article className="training-print-page training-detailed-plan" key={`detailed-page-${pageIndex}`}>
+                <header className="print-brand-header">
+                  <img src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/kdbc-logo.jpeg`} alt="Kingston Dragon Boat Club" />
+                  <div><span>Detailed Training Plan</span><strong>Page {pageIndex + 1} of {detailedPrintPages.length}</strong></div>
+                </header>
+                <div className="print-title-row"><div><p>{crew} crew · {duration} minutes</p><h1>{printTitle || `${focus} Practice`}</h1></div><div><span>Practice date</span><strong>{printDate || "Not set"}</strong></div></div>
+                <div className="print-session-strip"><span><b>Focus</b>{focus}</span><span><b>Emphasis</b>{emphasisLabel(emphasis)}</span><span><b>Festival</b>{festivalWeeks === 0 ? "Race day" : `${festivalWeeks} weeks`}</span><span><b>Total</b>{total} min</span></div>
+                <section className="detailed-print-blocks">
+                  {blocks.map((block, blockIndex) => <article className="detailed-print-card" key={block.id}><div className="detailed-print-number">{String(pageIndex * 3 + blockIndex + 1).padStart(2, "0")}</div><div><header><span>{block.minutes} minutes</span><h2>{block.name}</h2><p>{block.detail}</p></header><div className="detailed-print-grid"><section><b>Purpose</b><p>{block.objective}</p></section><section><b>Set</b><p>{block.set}</p></section></div><div className="detailed-print-cues"><b>Primary coach cue</b>{block.cues.slice(0, 1).map((cue) => <span key={cue}>{cue}</span>)}</div></div></article>)}
+                </section>
+                {pageIndex === detailedPrintPages.length - 1 && <div className="print-notes-box detailed-notes"><b>Coach&apos;s notes</b><p>{notes || ""}</p><span /><span /><span /></div>}
+                <footer className="print-page-footer"><span>KDBC Coach Tools</span><span>{printTitle || `${focus} Practice`} · {pageIndex + 1}/{detailedPrintPages.length}</span></footer>
+              </article>
+            ))
           )}
-          <footer className="print-page-footer"><span>KDBC Coach Tools</span><span>{printTitle || `${focus} Practice`}</span></footer>
         </section>
       )}
 
       </>}
 
-      {notice && <div className="toast" role="status">✓ {notice}</div>}
+      {exportingPrint && <div className="toast export-toast" role="status">Preparing {exportingPrint.toUpperCase()}…</div>}
+      {!exportingPrint && notice && <div className="toast" role="status">✓ {notice}</div>}
     </main>
   );
 }
