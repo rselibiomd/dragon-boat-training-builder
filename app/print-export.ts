@@ -95,7 +95,12 @@ async function renderPage(page: HTMLElement, orientation: PrintOrientation) {
     [...clone.querySelectorAll("img")].forEach((image, index) => {
       image.src = sourceImages[index]?.currentSrc || sourceImages[index]?.src || image.src;
     });
-    frameDocument.body.appendChild(clone);
+    const printDocument = page.closest<HTMLElement>(".print-document");
+    const wrapper = frameDocument.createElement("section");
+    wrapper.className = printDocument?.className ?? "print-document";
+    wrapper.style.display = "block";
+    wrapper.appendChild(clone);
+    frameDocument.body.appendChild(wrapper);
     await frameDocument.fonts?.ready;
     await waitForImages(clone);
 

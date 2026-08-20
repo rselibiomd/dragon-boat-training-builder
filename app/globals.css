@@ -4986,6 +4986,12 @@ input[type="range"] {
     height: 7.88in;
   }
 
+  .boat-print-crew .print-boat-sheet {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
   .boat-print-title {
     padding: 0.12in 0 0.09in;
   }
@@ -5028,7 +5034,7 @@ input[type="range"] {
 
   .boat-print-crew .dragon-boat-diagram {
     grid-template-rows: 0.52in minmax(0, 1fr) 0.3in;
-    height: 5.55in;
+    height: 5.25in;
     margin-top: 0.07in;
     width: 7.3in;
   }
@@ -5325,5 +5331,9 @@ input[type="range"] {
     left: 0;
     position: absolute;
     right: 0;
+  }
+
+  .boat-print-crew .print-boat-sheet > .print-page-footer {
+    position: static;
   }
 }
