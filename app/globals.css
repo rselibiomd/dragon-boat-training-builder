@@ -5004,28 +5004,6 @@ input[type="range"] {
     padding: 0.05in 0.09in;
   }
 
-  .crew-print-privacy {
-    align-items: center;
-    background: #edf7f1;
-    border-left: 3px solid #27835a;
-    color: #23483a;
-    display: flex;
-    gap: 0.1in;
-    min-height: 0.31in;
-    padding: 0.05in 0.09in;
-  }
-
-  .crew-print-privacy b {
-    color: #1e704b;
-    font-size: 6.2pt;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .crew-print-privacy span {
-    font-size: 7.2pt;
-  }
-
   .boat-print-note b {
     color: #c93038;
     font-size: 6.2pt;
@@ -5046,6 +5024,46 @@ input[type="range"] {
     margin: 0.1in auto 0;
     position: relative;
     width: 4.75in;
+  }
+
+  .boat-print-crew .dragon-boat-diagram {
+    grid-template-rows: 0.52in minmax(0, 1fr) 0.3in;
+    height: 5.55in;
+    margin-top: 0.07in;
+    width: 7.3in;
+  }
+
+  .boat-print-crew .dragon-prow {
+    height: 0.57in;
+    width: 1.12in;
+  }
+
+  .boat-print-crew .dragon-hull {
+    gap: 0.025in;
+    padding-left: 0.38in;
+    padding-right: 0.38in;
+  }
+
+  .boat-print-crew .print-seat strong {
+    font-size: 10pt;
+    line-height: 1.12;
+  }
+
+  .boat-print-crew .print-row-number b {
+    font-size: 10pt;
+  }
+
+  .boat-print-crew .print-row-number small,
+  .boat-print-crew .hull-side-label {
+    font-size: 5.6pt;
+  }
+
+  .boat-print-crew .boat-officials span {
+    font-size: 8.5pt;
+  }
+
+  .boat-print-crew .boat-officials b {
+    font-size: 6pt;
   }
 
   .dragon-prow {

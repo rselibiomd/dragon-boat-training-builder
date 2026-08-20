@@ -1596,7 +1596,7 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
               <label className="print-notes-field"><span>Print notes (optional)</span><input onChange={(event) => setPrintNotes(event.target.value)} placeholder="Race, crew call, lane, conditions…" value={printNotes} /></label>
             </div>
             <div className="print-choice-grid">
-              <article className="print-choice-card"><span className="print-choice-icon">♙</span><strong>Lineup only, no weights</strong><small>Names, rows, left/right positions, steer, drummer, spares, date, and your print note. No weights or private coaching data.</small><div className="print-format-actions"><button disabled={Boolean(exportingPrint)} onClick={() => printBoatPlan("crew")} type="button">Print</button><button disabled={Boolean(exportingPrint)} onClick={() => exportBoatPlan("crew", "pdf")} type="button">Save PDF</button><button disabled={Boolean(exportingPrint)} onClick={() => exportBoatPlan("crew", "png")} type="button">Save PNG</button></div></article>
+              <article className="print-choice-card"><span className="print-choice-icon">♙</span><strong>Minimal lineup, no weights</strong><small>A large, team-facing boat with names, rows, left/right positions, steer, drummer, date, and your print note. No spares, reminders, weights, or private coaching data.</small><div className="print-format-actions"><button disabled={Boolean(exportingPrint)} onClick={() => printBoatPlan("crew")} type="button">Print</button><button disabled={Boolean(exportingPrint)} onClick={() => exportBoatPlan("crew", "pdf")} type="button">Save PDF</button><button disabled={Boolean(exportingPrint)} onClick={() => exportBoatPlan("crew", "png")} type="button">Save PNG</button></div></article>
               <article className="print-choice-card"><span className="print-choice-icon">◎</span><strong>Coach-detail boat card</strong><small>Adds weight, side preference, rating summary, section profile, and lineup warnings.</small><div className="print-format-actions"><button disabled={Boolean(exportingPrint)} onClick={() => printBoatPlan("coach")} type="button">Print</button><button disabled={Boolean(exportingPrint)} onClick={() => exportBoatPlan("coach", "pdf")} type="button">Save PDF</button><button disabled={Boolean(exportingPrint)} onClick={() => exportBoatPlan("coach", "png")} type="button">Save PNG</button></div></article>
             </div>
             <p className="print-dialog-note">Each boat uses its own landscape Letter page. PDF creates one shareable document, PNG saves one image per boat.</p>
@@ -1616,10 +1616,9 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
             return <article className="print-boat-sheet" key={boat.id}>
               <header className="print-brand-header">
                 <img src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/kdbc-logo.jpeg`} alt="Kingston Dragon Boat Club" />
-                <div><span>{printVariant === "coach" ? "Coach-detail lineup" : "Crew lineup · no weights"}</span><strong>Boat {boatIndex + 1} of {boats.length}</strong></div>
+                <div><span>{printVariant === "coach" ? "Coach-detail lineup" : "Crew lineup, no weights"}</span><strong>Boat {boatIndex + 1} of {boats.length}</strong></div>
               </header>
-              <div className="boat-print-title"><div><p>{strategyText}{rebuildNeeded ? " · rebuild recommended" : ""} · {members.length} paddlers</p><h1>{lineupName} · {boat.name}</h1></div><div><span>Lineup date</span><strong>{printDate || "Not set"}</strong></div></div>
-              {printVariant === "crew" && <div className="crew-print-privacy"><b>Crew-facing copy</b><span>Assignments only — no weights or private coaching information</span></div>}
+              <div className="boat-print-title"><div><p>{printVariant === "crew" ? `${members.length} paddlers` : `${strategyText}${rebuildNeeded ? " · rebuild recommended" : ""} · ${members.length} paddlers`}</p><h1>{lineupName} · {boat.name}</h1></div><div><span>Lineup date</span><strong>{printDate || "Not set"}</strong></div></div>
               {printNotes && <div className="boat-print-note"><b>Coach note</b><span>{printNotes}</span></div>}
               <div className="boat-officials"><span><b>Steer</b>{boat.steerId ? paddlerMap.get(boat.steerId)?.name : "Unassigned"}</span><span><b>Drummer</b>{boat.drummerId ? paddlerMap.get(boat.drummerId)?.name : "Unassigned"}</span></div>
 
@@ -1643,10 +1642,10 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
 
               {printVariant === "coach" && <div className="coach-print-summary"><div><span>Recommendation</span><strong>{quality}%</strong></div><div><span>Data confidence</span><strong>{confidence}%</strong></div><div><span>Constraint status</span><strong>{constraintStatus(boat)}</strong></div><div><span>Side trim</span><strong>{trim.reliable ? `${Math.abs(trim.left - trim.right).toFixed(1)} kg` : "Uncertain"}</strong></div><div><span>Weight coverage</span><strong>{trim.coverage}%</strong></div><div><span>Front</span><strong>{formatProfile(profile.front)}</strong></div><div><span>Middle</span><strong>{formatProfile(profile.middle)}</strong></div><div><span>Back</span><strong>{formatProfile(profile.back)}</strong></div></div>}
 
-              <div className="boat-print-footer-grid">
+              {printVariant === "coach" && <div className="boat-print-footer-grid">
                 <section><b>Spares / roster bench</b><p>{spares.length ? spares.map((paddler) => paddler.name).join(" · ") : "No spares listed"}</p></section>
-                {printVariant === "coach" ? <section className={boat.warnings.length ? "warning" : ""}><b>{boat.warnings.length ? "Coach checks" : "Lineup checks"}</b><p>{boat.warnings.length ? boat.warnings.join(" ") : "No major flags. Confirm trim once the crew is aboard."}</p></section> : <section><b>Crew reminder</b><p>Confirm your side and row before loading. Follow the coach or steer&apos;s final direction at the dock.</p></section>}
-              </div>
+                <section className={boat.warnings.length ? "warning" : ""}><b>{boat.warnings.length ? "Coach checks" : "Lineup checks"}</b><p>{boat.warnings.length ? boat.warnings.join(" ") : "No major flags. Confirm trim once the crew is aboard."}</p></section>
+              </div>}
               <footer className="print-page-footer"><span>KDBC Coach Tools</span><span>{lineupName} · {boat.name}</span></footer>
             </article>;
           })}

@@ -71,12 +71,19 @@ test("Release 1/2 hardening uses unified sessions and validated backups", () => 
 });
 
 test("crew print is explicitly weight-free and coach details stay coach-only", () => {
-  assert.match(boats, /Lineup only, no weights/);
-  assert.match(boats, /Crew lineup · no weights/);
-  assert.match(boats, /Assignments only — no weights or private coaching information/);
+  assert.match(boats, /Minimal lineup, no weights/);
+  assert.match(boats, /Crew lineup, no weights/);
   assert.match(boats, /printVariant === "coach" && left && <small>\{left\.weightKg/);
   assert.match(boats, /printVariant === "coach" && right && <small>\{right\.weightKg/);
   assert.match(boats, /printVariant === "coach" && <div className="coach-print-summary">/);
+});
+
+test("minimal crew lineup enlarges the boat and omits coach-only footer content", async () => {
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(boats, /printVariant === "coach" && <div className="boat-print-footer-grid">/);
+  assert.doesNotMatch(boats, /Crew reminder/);
+  assert.match(styles, /\.boat-print-crew \.dragon-boat-diagram[\s\S]*height: 5\.55in;[\s\S]*width: 7\.3in;/);
+  assert.match(styles, /\.boat-print-crew \.print-seat strong[\s\S]*font-size: 10pt;/);
 });
 
 test("print and direct export formats share explicit page boundaries", async () => {
