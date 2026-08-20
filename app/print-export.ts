@@ -172,6 +172,9 @@ export async function exportPrintPages({ filename, format, orientation, pageSele
     if (index) pdf.addPage("letter", orientation);
     pdf.addImage(page.toDataURL("image/png"), "PNG", 0, 0, size.width, size.height, undefined, "FAST");
   });
+  while (pdf.getNumberOfPages() > renderedPages.length) {
+    pdf.deletePage(pdf.getNumberOfPages());
+  }
   pdf.save(`${safeName}.pdf`);
   return renderedPages.length;
 }

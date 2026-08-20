@@ -82,10 +82,8 @@ test("minimal crew lineup enlarges the boat and omits coach-only footer content"
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(boats, /printVariant === "coach" && <div className="boat-print-footer-grid">/);
   assert.doesNotMatch(boats, /Crew reminder/);
-  assert.match(styles, /\.boat-print-crew \.print-boat-sheet[\s\S]*height: auto;[\s\S]*overflow: visible;/);
   assert.match(styles, /\.boat-print-crew \.dragon-boat-diagram[\s\S]*height: 5\.25in;[\s\S]*width: 7\.3in;/);
   assert.match(styles, /\.boat-print-crew \.print-seat strong[\s\S]*font-size: 10pt;/);
-  assert.match(styles, /\.boat-print-crew \.print-boat-sheet > \.print-page-footer[\s\S]*position: static;/);
 });
 
 test("print and direct export formats share explicit page boundaries", async () => {
@@ -98,9 +96,17 @@ test("print and direct export formats share explicit page boundaries", async () 
   assert.match(exportSource, /new jsPDF/);
   assert.match(exportSource, /html2canvas/);
   assert.match(exportSource, /page\.closest<HTMLElement>\("\.print-document"\)/);
+  assert.match(exportSource, /while \(pdf\.getNumberOfPages\(\) > renderedPages\.length\)/);
   assert.match(styles, /\.training-print-page:not\(:last-child\),\s*\.print-boat-sheet:not\(:last-child\)/);
   assert.match(styles, /page-break-after: always/);
   assert.match(styles, /\.print-boat-sheet:last-child[\s\S]*page-break-after: auto/);
+  assert.match(styles, /\.training-print-document,\s*\.boat-print-document\s*\{\s*display: contents !important;/);
+  assert.match(styles, /\.training-print-page\s*\{\s*page: training;/);
+  assert.match(styles, /\.print-boat-sheet\s*\{\s*page: boat;/);
+  assert.match(styles, /\.training-print-page,\s*\.print-boat-sheet[\s\S]*height: auto;[\s\S]*overflow: visible;/);
+  assert.match(styles, /\.training-print-page > \.print-page-footer,\s*\.print-boat-sheet > \.print-page-footer\s*\{\s*position: static;/);
+  assert.doesNotMatch(styles, /height: 10\.22in/);
+  assert.doesNotMatch(styles, /height: 7\.88in/);
   assert.doesNotMatch(styles, /\.print-boat-sheet\s*\{\s*break-after: page/);
 });
 

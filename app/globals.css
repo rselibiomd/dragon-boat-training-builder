@@ -4568,27 +4568,30 @@ input[type="range"] {
     padding: 0 !important;
   }
 
+  .training-print-document,
+  .boat-print-document {
+    display: contents !important;
+  }
+
   .boat-planner-shell > *:not(.boat-print-document) {
     display: none !important;
   }
 
-  .training-print-document {
+  .training-print-page {
     page: training;
   }
 
-  .boat-print-document {
+  .print-boat-sheet {
     page: boat;
   }
 
   .training-print-page,
   .print-boat-sheet {
     box-sizing: border-box;
-    overflow: hidden;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
     position: relative;
-  }
-
-  .training-print-page {
-    height: 10.22in;
   }
 
   .training-print-page:not(:last-child),
@@ -4877,13 +4880,6 @@ input[type="range"] {
     padding-top: 0.06in;
   }
 
-  .training-print-page > .print-page-footer {
-    bottom: 0;
-    left: 0;
-    position: absolute;
-    right: 0;
-  }
-
   .training-detailed-plan .print-title-row {
     padding-top: 0.18in;
   }
@@ -4980,16 +4976,6 @@ input[type="range"] {
   .detailed-notes {
     break-inside: avoid;
     min-height: 1.2in;
-  }
-
-  .print-boat-sheet {
-    height: 7.88in;
-  }
-
-  .boat-print-crew .print-boat-sheet {
-    height: auto;
-    min-height: 0;
-    overflow: visible;
   }
 
   .boat-print-title {
@@ -5326,14 +5312,8 @@ input[type="range"] {
     margin: 0.04in 0 0;
   }
 
+  .training-print-page > .print-page-footer,
   .print-boat-sheet > .print-page-footer {
-    bottom: 0;
-    left: 0;
-    position: absolute;
-    right: 0;
-  }
-
-  .boat-print-crew .print-boat-sheet > .print-page-footer {
     position: static;
   }
 }
