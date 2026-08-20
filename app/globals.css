@@ -4876,7 +4876,10 @@ input[type="range"] {
     display: flex;
     font-size: 6pt;
     justify-content: space-between;
+    line-height: 1.3;
     margin-top: 0.1in;
+    min-height: 0.18in;
+    padding-bottom: 0.02in;
     padding-top: 0.06in;
   }
 
@@ -5058,6 +5061,22 @@ input[type="range"] {
     font-size: 6pt;
   }
 
+  .boat-officials {
+    background: #f2f6f8;
+    border: 1px solid #cbd7df;
+    display: grid;
+    gap: 0.12in;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    margin-top: 0.08in;
+    padding: 0.07in 0.1in;
+  }
+
+  .boat-officials span,
+  .boat-officials b {
+    display: block;
+    min-width: 0;
+  }
+
   .dragon-prow {
     align-items: center;
     align-self: end;
@@ -5174,13 +5193,14 @@ input[type="range"] {
 
   .print-seat strong {
     color: #112b3f;
-    display: -webkit-box;
+    display: block;
     font-size: 6.8pt;
     line-height: 1.15;
+    max-height: none;
     overflow: hidden;
-    overflow-wrap: anywhere;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
   }
 
   .print-seat small {

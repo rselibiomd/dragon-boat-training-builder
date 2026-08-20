@@ -20,15 +20,19 @@ function cleanFilename(value: string) {
   return value.trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "kdbc-export";
 }
 
-function printStyles() {
+function exportStyles() {
   const rules: string[] = [];
   [...document.styleSheets].forEach((sheet) => {
     try {
       [...sheet.cssRules].forEach((rule) => {
-        if (rule.type !== CSSRule.MEDIA_RULE) return;
-        const mediaRule = rule as CSSMediaRule;
-        if (!mediaRule.conditionText.toLowerCase().includes("print")) return;
-        [...mediaRule.cssRules].forEach((nestedRule) => rules.push(nestedRule.cssText));
+        if (rule.type === CSSRule.MEDIA_RULE) {
+          const mediaRule = rule as CSSMediaRule;
+          if (mediaRule.conditionText.toLowerCase().includes("print")) {
+            [...mediaRule.cssRules].forEach((nestedRule) => rules.push(nestedRule.cssText));
+          }
+          return;
+        }
+        rules.push(rule.cssText);
       });
     } catch {
       // Ignore browser or extension stylesheets that are not readable from this origin.
@@ -84,8 +88,16 @@ async function renderPage(page: HTMLElement, orientation: PrintOrientation) {
     frameDocument.write(`<!doctype html><html><head><meta charset="utf-8"><base href="${document.baseURI}"><style>
       html, body { background: #fff !important; color: #102437; font-family: Arial, Helvetica, sans-serif; margin: 0 !important; padding: 0 !important; }
       *, *::before, *::after { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      ${printStyles()}
-      .export-document-page { display: block !important; margin: 0 !important; width: ${contentWidth}in !important; }
+      ${exportStyles()}
+      .export-document-page {
+        break-after: auto !important;
+        display: block !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        padding-bottom: 0.08in !important;
+        page-break-after: auto !important;
+        width: ${contentWidth}in !important;
+      }
     </style></head><body></body></html>`);
     frameDocument.close();
 
@@ -103,6 +115,7 @@ async function renderPage(page: HTMLElement, orientation: PrintOrientation) {
     frameDocument.body.appendChild(wrapper);
     await frameDocument.fonts?.ready;
     await waitForImages(clone);
+    await new Promise<void>((resolve) => frame.contentWindow?.requestAnimationFrame(() => frame.contentWindow?.requestAnimationFrame(() => resolve())) ?? resolve());
 
     return await html2canvas(clone, {
       backgroundColor: "#ffffff",

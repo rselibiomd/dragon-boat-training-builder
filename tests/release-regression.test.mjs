@@ -96,6 +96,9 @@ test("print and direct export formats share explicit page boundaries", async () 
   assert.match(exportSource, /new jsPDF/);
   assert.match(exportSource, /html2canvas/);
   assert.match(exportSource, /page\.closest<HTMLElement>\("\.print-document"\)/);
+  assert.match(exportSource, /function exportStyles\(\)/);
+  assert.match(exportSource, /rules\.push\(rule\.cssText\)/);
+  assert.match(exportSource, /frame\.contentWindow\?\.requestAnimationFrame/);
   assert.match(exportSource, /while \(pdf\.getNumberOfPages\(\) > renderedPages\.length\)/);
   assert.match(styles, /\.training-print-page:not\(:last-child\),\s*\.print-boat-sheet:not\(:last-child\)/);
   assert.match(styles, /page-break-after: always/);
@@ -105,6 +108,10 @@ test("print and direct export formats share explicit page boundaries", async () 
   assert.match(styles, /\.print-boat-sheet\s*\{\s*page: boat;/);
   assert.match(styles, /\.training-print-page,\s*\.print-boat-sheet[\s\S]*height: auto;[\s\S]*overflow: visible;/);
   assert.match(styles, /\.training-print-page > \.print-page-footer,\s*\.print-boat-sheet > \.print-page-footer\s*\{\s*position: static;/);
+  assert.match(styles, /\.boat-officials\s*\{[\s\S]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\);/);
+  assert.match(styles, /\.print-seat strong\s*\{[\s\S]*display: block;[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;/);
+  assert.doesNotMatch(styles, /-webkit-line-clamp: 2/);
+  assert.match(styles, /\.print-page-footer\s*\{[\s\S]*line-height: 1\.3;[\s\S]*min-height: 0\.18in;[\s\S]*padding-bottom: 0\.02in;/);
   assert.doesNotMatch(styles, /height: 10\.22in/);
   assert.doesNotMatch(styles, /height: 7\.88in/);
   assert.doesNotMatch(styles, /\.print-boat-sheet\s*\{\s*break-after: page/);
