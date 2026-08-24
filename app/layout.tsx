@@ -32,9 +32,9 @@ export const metadata: Metadata = {
     "theme-color": "#071827",
   },
   icons: {
-    icon: `${basePath}/app-icon.svg`,
-    shortcut: `${basePath}/app-icon.svg`,
-    apple: `${basePath}/kdbc-logo.jpeg`,
+    icon: `${basePath}/kdbc-logo-official.svg`,
+    shortcut: `${basePath}/kdbc-logo-official.svg`,
+    apple: `${basePath}/kdbc-logo-official.svg`,
   },
 };
 
