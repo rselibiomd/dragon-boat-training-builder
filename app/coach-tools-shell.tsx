@@ -27,6 +27,7 @@ function clickModule(label: "Training Builder" | "Boat Planner") {
 
 export default function CoachToolsShell() {
   const [open, setOpen] = useState(true);
+  const [strokeOpen, setStrokeOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [installMessage, setInstallMessage] = useState("");
   const [standalone, setStandalone] = useState(false);
@@ -48,6 +49,9 @@ export default function CoachToolsShell() {
     } else if (requestedTool === "boats") {
       setOpen(false);
       clickModule("Boat Planner");
+    } else if (requestedTool === "stroke") {
+      setOpen(false);
+      setStrokeOpen(true);
     }
 
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
@@ -65,6 +69,7 @@ export default function CoachToolsShell() {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
+      setStrokeOpen(false);
       setOpen(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
@@ -81,12 +86,18 @@ export default function CoachToolsShell() {
   }, [basePath]);
 
   const openTool = (tool: "training" | "boats" | "stroke") => {
+    setOpen(false);
     if (tool === "stroke") {
-      window.location.assign(strokeReviewUrl);
+      setStrokeOpen(true);
       return;
     }
-    setOpen(false);
+    setStrokeOpen(false);
     clickModule(tool === "training" ? "Training Builder" : "Boat Planner");
+  };
+
+  const openHome = () => {
+    setStrokeOpen(false);
+    setOpen(true);
   };
 
   const installApp = async () => {
@@ -174,8 +185,24 @@ export default function CoachToolsShell() {
         </div>
       </div>
 
-      {!open && (
-        <button className="coach-tools-home-return" type="button" onClick={() => setOpen(true)} aria-label="Open KDBC Coach Tools home">
+      {strokeOpen && (
+        <div className="coach-tools-stroke-workspace">
+          <header>
+            <button type="button" onClick={openHome}>← Coach Tools</button>
+            <strong>Stroke Review</strong>
+            <a href={strokeReviewUrl} target="_blank" rel="noreferrer">Open separately</a>
+          </header>
+          <iframe
+            src={strokeReviewUrl}
+            title="KDBC Dragonboat Stroke Review"
+            allow="fullscreen"
+            allowFullScreen
+          />
+        </div>
+      )}
+
+      {!open && !strokeOpen && (
+        <button className="coach-tools-home-return" type="button" onClick={openHome} aria-label="Open KDBC Coach Tools home">
           Coach Tools
         </button>
       )}
