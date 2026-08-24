@@ -4,6 +4,7 @@ import Script from "next/script";
 import CoachToolsShell from "./coach-tools-shell";
 import "./globals.css";
 import "./coach-tools-shell.css";
+import "./no-logo.css";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
