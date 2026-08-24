@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kdbc-coach-tools-v3-neutral-brand';
+const CACHE_NAME = 'kdbc-coach-tools-v4-clean-branding';
 const APP_ROOT = '/dragon-boat-training-builder/';
 const CORE = [
   APP_ROOT,
@@ -27,7 +27,7 @@ self.addEventListener('fetch', event => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-store' })
         .then(response => {
           const copy = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(request, copy)).catch(() => {});
@@ -38,10 +38,15 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  const isBrandAsset = url.pathname.endsWith('/app-icon.svg') || url.pathname.endsWith('/manifest.webmanifest');
-  if (isBrandAsset) {
+  const alwaysFresh =
+    url.pathname.endsWith('/manifest.webmanifest') ||
+    url.pathname.endsWith('/app-icon.svg') ||
+    url.pathname.includes('/_next/static/css/') ||
+    url.pathname.includes('/_next/static/chunks/');
+
+  if (alwaysFresh) {
     event.respondWith(
-      fetch(request, { cache: 'reload' })
+      fetch(request, { cache: 'no-store' })
         .then(response => {
           if (response.ok) {
             const copy = response.clone();
