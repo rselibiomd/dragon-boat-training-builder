@@ -1,0 +1,41 @@
+{
+  "name": "KDBC Coach Tools",
+  "short_name": "Coach Tools",
+  "description": "KDBC coaching workspace for stroke review, practice planning, and boat organization.",
+  "start_url": "/dragon-boat-training-builder/",
+  "scope": "/dragon-boat-training-builder/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "any",
+  "background_color": "#071827",
+  "theme_color": "#071827",
+  "categories": ["sports", "productivity", "education"],
+  "icons": [
+    {
+      "src": "/dragon-boat-training-builder/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Stroke Review",
+      "short_name": "Stroke Review",
+      "url": "/dragon-boat-training-builder/?tool=stroke",
+      "icons": [{ "src": "/dragon-boat-training-builder/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Training Builder",
+      "short_name": "Training",
+      "url": "/dragon-boat-training-builder/?tool=training",
+      "icons": [{ "src": "/dragon-boat-training-builder/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Boat Planner",
+      "short_name": "Boat Planner",
+      "url": "/dragon-boat-training-builder/?tool=boats",
+      "icons": [{ "src": "/dragon-boat-training-builder/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}
