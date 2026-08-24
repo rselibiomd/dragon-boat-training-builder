@@ -125,7 +125,7 @@ export default function CoachToolsShell() {
         <div className="coach-tools-home-inner">
           <header className="coach-tools-home-header">
             <div className="coach-tools-brand">
-              <img src={`${basePath}/kdbc-logo.jpeg`} alt="Kingston Dragon Boat Club" />
+              <img src={`${basePath}/kdbc-logo-official.svg`} alt="Kingston Dragon Boat Club" />
               <div>
                 <p>KINGSTON DRAGON BOAT CLUB</p>
                 <h1>KDBC Coach Tools</h1>
