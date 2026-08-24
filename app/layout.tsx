@@ -47,6 +47,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Script src={`${basePath}/stroke-review-bridge.js`} strategy="beforeInteractive" />
+        <Script src={`${basePath}/kdbc-brand-fix.js`} strategy="afterInteractive" />
         {children}
         <CoachToolsShell />
       </body>
