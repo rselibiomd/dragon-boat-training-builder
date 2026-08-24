@@ -25,6 +25,12 @@ function clickModule(label: "Training Builder" | "Boat Planner") {
   window.setTimeout(attempt, 450);
 }
 
+function hideLegacyClubLogos() {
+  document.querySelectorAll<HTMLElement>(".brand-logo-frame").forEach((element) => {
+    element.style.display = "none";
+  });
+}
+
 export default function CoachToolsShell() {
   const [open, setOpen] = useState(true);
   const [strokeOpen, setStrokeOpen] = useState(false);
@@ -75,6 +81,10 @@ export default function CoachToolsShell() {
     };
     document.addEventListener("click", brandHandler, true);
 
+    hideLegacyClubLogos();
+    const logoObserver = new MutationObserver(hideLegacyClubLogos);
+    logoObserver.observe(document.body, { childList: true, subtree: true });
+
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register(`${basePath}/sw.js`).catch(() => {});
     }
@@ -82,6 +92,7 @@ export default function CoachToolsShell() {
     return () => {
       window.removeEventListener("beforeinstallprompt", installHandler);
       document.removeEventListener("click", brandHandler, true);
+      logoObserver.disconnect();
     };
   }, [basePath]);
 
@@ -125,7 +136,6 @@ export default function CoachToolsShell() {
         <div className="coach-tools-home-inner">
           <header className="coach-tools-home-header">
             <div className="coach-tools-brand">
-              <img src={`${basePath}/kdbc-logo-official.svg`} alt="Kingston Dragon Boat Club" />
               <div>
                 <p>KINGSTON DRAGON BOAT CLUB</p>
                 <h1>KDBC Coach Tools</h1>
