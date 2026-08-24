@@ -32,9 +32,9 @@ export const metadata: Metadata = {
     "theme-color": "#071827",
   },
   icons: {
-    icon: `${basePath}/kdbc-logo-official.svg`,
-    shortcut: `${basePath}/kdbc-logo-official.svg`,
-    apple: `${basePath}/kdbc-logo-official.svg`,
+    icon: `${basePath}/app-icon.svg`,
+    shortcut: `${basePath}/app-icon.svg`,
+    apple: `${basePath}/app-icon.svg`,
   },
 };
 
@@ -47,7 +47,6 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Script src={`${basePath}/stroke-review-bridge.js`} strategy="beforeInteractive" />
-        <Script src={`${basePath}/kdbc-brand-fix.js`} strategy="afterInteractive" />
         {children}
         <CoachToolsShell />
       </body>
