@@ -7,15 +7,15 @@
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone"],
   "orientation": "any",
-  "background_color": "#071827",
+  "background_color": "#ffffff",
   "theme_color": "#071827",
   "categories": ["sports", "productivity", "education"],
   "icons": [
     {
-      "src": "/dragon-boat-training-builder/app-icon.svg",
+      "src": "/dragon-boat-training-builder/kdbc-logo-official.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ],
   "shortcuts": [
@@ -23,19 +23,19 @@
       "name": "Stroke Review",
       "short_name": "Stroke Review",
       "url": "/dragon-boat-training-builder/?tool=stroke",
-      "icons": [{ "src": "/dragon-boat-training-builder/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [{ "src": "/dragon-boat-training-builder/kdbc-logo-official.svg", "sizes": "any", "type": "image/svg+xml" }]
     },
     {
       "name": "Training Builder",
       "short_name": "Training",
       "url": "/dragon-boat-training-builder/?tool=training",
-      "icons": [{ "src": "/dragon-boat-training-builder/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [{ "src": "/dragon-boat-training-builder/kdbc-logo-official.svg", "sizes": "any", "type": "image/svg+xml" }]
     },
     {
       "name": "Boat Planner",
       "short_name": "Boat Planner",
       "url": "/dragon-boat-training-builder/?tool=boats",
-      "icons": [{ "src": "/dragon-boat-training-builder/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [{ "src": "/dragon-boat-training-builder/kdbc-logo-official.svg", "sizes": "any", "type": "image/svg+xml" }]
     }
   ]
 }
