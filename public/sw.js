@@ -1,10 +1,9 @@
-const CACHE_NAME = 'kdbc-coach-tools-v1';
+const CACHE_NAME = 'kdbc-coach-tools-v2-official-logo';
 const APP_ROOT = '/dragon-boat-training-builder/';
 const CORE = [
   APP_ROOT,
   `${APP_ROOT}manifest.webmanifest`,
-  `${APP_ROOT}app-icon.svg`,
-  `${APP_ROOT}kdbc-logo.jpeg`
+  `${APP_ROOT}kdbc-logo-official.svg`
 ];
 
 self.addEventListener('install', event => {
@@ -35,6 +34,22 @@ self.addEventListener('fetch', event => {
           return response;
         })
         .catch(async () => (await caches.match(request)) || (await caches.match(APP_ROOT)))
+    );
+    return;
+  }
+
+  const isBrandAsset = url.pathname.endsWith('/kdbc-logo-official.svg') || url.pathname.endsWith('/manifest.webmanifest');
+  if (isBrandAsset) {
+    event.respondWith(
+      fetch(request, { cache: 'reload' })
+        .then(response => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, copy)).catch(() => {});
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
     );
     return;
   }
