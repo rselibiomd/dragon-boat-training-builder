@@ -1,0 +1,12 @@
+/* Temporary clean branding: no club logo images */
+.brand-logo-frame,
+.brand-logo,
+.kdbc-logo,
+.coach-tools-brand img{
+  display:none!important;
+}
+
+.brand,
+.coach-tools-brand{
+  gap:0!important;
+}
