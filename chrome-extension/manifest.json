@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "KDBC Coach Tools",
+  "version": "1.5.0",
+  "description": "Open KDBC Coach Tools in a dedicated coaching window.",
+  "permissions": ["windows"],
+  "action": {
+    "default_title": "Open KDBC Coach Tools"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
