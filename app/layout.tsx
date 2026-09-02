@@ -5,6 +5,7 @@ import CoachToolsShell from "./coach-tools-shell";
 import "./globals.css";
 import "./coach-tools-shell.css";
 import "./no-logo.css";
+import "./boat-planner-enhancements.css";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
@@ -48,6 +49,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Script src={`${basePath}/stroke-review-bridge.js`} strategy="beforeInteractive" />
+        <Script src={`${basePath}/boat-planner-enhancements.js`} strategy="afterInteractive" />
         {children}
         <CoachToolsShell />
       </body>
