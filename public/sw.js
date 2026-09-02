@@ -1,10 +1,11 @@
-const CACHE_NAME = 'kdbc-coach-tools-v5-boat-planner-squads';
+const CACHE_NAME = 'kdbc-coach-tools-v6-boat-planner-complete';
 const APP_ROOT = '/dragon-boat-training-builder/';
 const CORE = [
   APP_ROOT,
   `${APP_ROOT}manifest.webmanifest`,
   `${APP_ROOT}app-icon.svg`,
-  `${APP_ROOT}boat-planner-enhancements.js`
+  `${APP_ROOT}boat-planner-enhancements.js`,
+  `${APP_ROOT}boat-planner-enhancements-patch.js`
 ];
 
 self.addEventListener('install', event => {
@@ -43,6 +44,7 @@ self.addEventListener('fetch', event => {
     url.pathname.endsWith('/manifest.webmanifest') ||
     url.pathname.endsWith('/app-icon.svg') ||
     url.pathname.endsWith('/boat-planner-enhancements.js') ||
+    url.pathname.endsWith('/boat-planner-enhancements-patch.js') ||
     url.pathname.includes('/_next/static/css/') ||
     url.pathname.includes('/_next/static/chunks/');
 
