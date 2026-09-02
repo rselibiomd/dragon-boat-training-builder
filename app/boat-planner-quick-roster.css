@@ -1,0 +1,295 @@
+/* Quick roster controls for Squad / Team management */
+.native-roster-search {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto auto auto;
+  gap: 8px;
+  align-items: end;
+  margin: 12px 0 14px;
+  padding: 10px;
+  border: 1px solid var(--native-line);
+  border-radius: 10px;
+  background: var(--native-surface-soft);
+}
+
+.native-roster-search label > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--native-muted);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.native-roster-search input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--native-line);
+  border-radius: 8px;
+  background: var(--native-surface);
+  color: var(--native-text);
+  padding: 7px 10px;
+  font: inherit;
+}
+
+.native-roster-search input::placeholder {
+  color: var(--native-muted);
+}
+
+.native-roster-search button {
+  min-height: 38px;
+  border: 1px solid var(--native-line);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.native-search-button {
+  border-color: var(--native-accent) !important;
+  background: var(--native-accent) !important;
+  color: #fff !important;
+}
+
+.native-search-button:hover {
+  border-color: var(--native-accent-strong) !important;
+  background: var(--native-accent-strong) !important;
+}
+
+.native-clear-search {
+  background: var(--native-surface) !important;
+  color: var(--native-muted) !important;
+}
+
+.native-roster-search > small {
+  align-self: center;
+  color: var(--native-muted);
+  white-space: nowrap;
+  font-size: .76rem;
+}
+
+.native-squad-role-control {
+  display: grid;
+  grid-template-columns: auto minmax(112px, 1fr);
+  gap: 6px;
+  align-items: center;
+  min-width: 220px;
+}
+
+.native-core-check {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  border: 1px solid var(--native-line);
+  border-radius: 8px;
+  background: var(--native-surface-soft);
+  color: var(--native-muted);
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.native-core-check input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.native-core-check span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: .78rem;
+  font-weight: 760;
+}
+
+.native-core-check b {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--native-line);
+  border-radius: 5px;
+  background: var(--native-surface);
+  color: transparent;
+  font-size: .74rem;
+}
+
+.native-core-check.is-active {
+  border-color: color-mix(in srgb, var(--native-success) 54%, var(--native-line));
+  background: color-mix(in srgb, var(--native-success) 10%, var(--native-surface));
+  color: var(--native-text);
+}
+
+.native-core-check.is-active b {
+  border-color: var(--native-success);
+  background: var(--native-success);
+  color: #fff;
+}
+
+.native-squad-role-control select:disabled {
+  opacity: .45;
+}
+
+.native-attendance-buttons {
+  display: inline-flex;
+  gap: 4px;
+  min-width: 246px;
+}
+
+.native-attendance-buttons button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 34px;
+  border: 1px solid var(--native-line);
+  border-radius: 7px;
+  background: var(--native-surface-soft);
+  color: var(--native-muted);
+  padding: 5px 8px;
+  font: inherit;
+  font-size: .74rem;
+  font-weight: 720;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.native-attendance-buttons button b {
+  font-size: .9rem;
+  line-height: 1;
+}
+
+.native-attendance-buttons button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--native-accent) 35%, var(--native-line));
+  color: var(--native-text);
+}
+
+.native-attendance-buttons button:disabled {
+  opacity: .38;
+  cursor: not-allowed;
+}
+
+.native-attendance-buttons .confirmed.is-active {
+  border-color: color-mix(in srgb, var(--native-success) 60%, var(--native-line));
+  background: color-mix(in srgb, var(--native-success) 12%, var(--native-surface));
+  color: var(--native-success);
+}
+
+.native-attendance-buttons .unconfirmed.is-active {
+  border-color: color-mix(in srgb, var(--native-warning) 60%, var(--native-line));
+  background: color-mix(in srgb, var(--native-warning) 12%, var(--native-surface));
+  color: var(--native-warning);
+}
+
+.native-attendance-buttons .out.is-active {
+  border-color: color-mix(in srgb, var(--native-danger) 60%, var(--native-line));
+  background: color-mix(in srgb, var(--native-danger) 11%, var(--native-surface));
+  color: var(--native-danger);
+}
+
+.native-no-results {
+  padding: 22px 10px !important;
+  color: var(--native-muted);
+  text-align: center !important;
+  font-size: .84rem;
+}
+
+.app-shell.theme-dark .native-roster-search {
+  border-color: #294255;
+  background: #071a28;
+}
+
+.app-shell.theme-dark .native-roster-search input,
+.app-shell.theme-dark .native-clear-search,
+.app-shell.theme-dark .native-core-check,
+.app-shell.theme-dark .native-attendance-buttons button {
+  border-color: #355267;
+  background: #102c42;
+  color: #a9bdca;
+}
+
+.app-shell.theme-dark .native-roster-search input {
+  color: #eef5f9;
+  color-scheme: dark;
+}
+
+.app-shell.theme-dark .native-core-check.is-active {
+  border-color: #4e9870;
+  background: #102f2b;
+  color: #dff5e7;
+}
+
+.app-shell.theme-dark .native-attendance-buttons .confirmed.is-active {
+  border-color: #4e9870;
+  background: #102f2b;
+  color: #8bd3a7;
+}
+
+.app-shell.theme-dark .native-attendance-buttons .unconfirmed.is-active {
+  border-color: #856f36;
+  background: #302b1a;
+  color: #e4c36a;
+}
+
+.app-shell.theme-dark .native-attendance-buttons .out.is-active {
+  border-color: #8f4d54;
+  background: #321d25;
+  color: #ff9298;
+}
+
+.app-shell.theme-neo .native-roster-search,
+.app-shell.theme-neo .native-roster-search input,
+.app-shell.theme-neo .native-roster-search button,
+.app-shell.theme-neo .native-core-check,
+.app-shell.theme-neo .native-core-check b,
+.app-shell.theme-neo .native-attendance-buttons button {
+  border-radius: 4px;
+}
+
+@media (max-width: 900px) {
+  .native-roster-search {
+    grid-template-columns: 1fr auto auto;
+  }
+
+  .native-roster-search > small {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 650px) {
+  .native-roster-search {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .native-roster-search label {
+    grid-column: 1 / -1;
+  }
+
+  .native-roster-search > small {
+    grid-column: 1 / -1;
+  }
+
+  .native-squad-role-control {
+    min-width: 205px;
+  }
+
+  .native-attendance-buttons {
+    min-width: 220px;
+  }
+
+  .native-attendance-buttons button span {
+    display: none;
+  }
+
+  .native-attendance-buttons button {
+    min-width: 42px;
+  }
+}
+
+@media print {
+  .native-roster-search {
+    display: none !important;
+  }
+}
