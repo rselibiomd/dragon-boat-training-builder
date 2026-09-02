@@ -426,7 +426,7 @@
   margin-top: 12px !important;
 }
 
-/* Dark theme keeps the same structure while lifting contrast for low-light dockside use. */
+/* Dark theme uses a quieter toolbar hierarchy so every action does not look equally important. */
 .app-shell.theme-dark .native-squad-console {
   --native-success: #8bd3a7;
   --native-warning: #e4c36a;
@@ -438,6 +438,127 @@
 .app-shell.theme-dark .native-roster-table select,
 .app-shell.theme-dark .native-roster-table input[type="number"] {
   color-scheme: dark;
+}
+
+.app-shell.theme-dark .native-squad-actions {
+  width: fit-content;
+  max-width: 100%;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid #294255;
+  border-radius: 10px;
+  background: #071a28;
+}
+
+.app-shell.theme-dark .native-squad-actions button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #a9bdca;
+  padding: 6px 9px;
+  box-shadow: none;
+  font-weight: 720;
+}
+
+.app-shell.theme-dark .native-squad-actions button:first-child {
+  background: #102c42;
+  color: #eef5f9;
+}
+
+.app-shell.theme-dark .native-squad-actions button:nth-child(4) {
+  color: #f3f8fb;
+}
+
+.app-shell.theme-dark .native-squad-actions button:last-child {
+  color: #7892a4;
+  font-weight: 650;
+}
+
+.app-shell.theme-dark .native-squad-actions button:hover:not(:disabled) {
+  border-color: transparent;
+  background: #16364e;
+  color: #fff;
+  transform: none;
+}
+
+.app-shell.theme-dark .native-squad-actions button:disabled {
+  background: transparent;
+  color: #5f788a;
+  opacity: .55;
+}
+
+.app-shell.theme-dark .native-squad-summary {
+  background: #071a28;
+}
+
+.app-shell.theme-dark .native-squad-summary > span,
+.app-shell.theme-dark .native-core-toggle {
+  border-color: #294255;
+  background: #0f2b40;
+}
+
+.app-shell.theme-dark .native-squad-summary .native-apply {
+  min-height: 36px;
+  padding: 7px 14px;
+  border: 1px solid #ff565d;
+  border-radius: 7px;
+  background: #ff565d;
+  color: #fff;
+  box-shadow: none;
+}
+
+.app-shell.theme-dark .native-squad-summary .native-apply:hover:not(:disabled) {
+  border-color: #ff6c72;
+  background: #ff6c72;
+}
+
+.app-shell.theme-dark .native-lock-row {
+  gap: 5px;
+  background: #0b2234;
+}
+
+.app-shell.theme-dark .native-lock-row button {
+  min-height: 32px;
+  padding: 5px 9px;
+  border: 1px solid #294255;
+  border-radius: 6px;
+  background: transparent;
+  color: #91a8b9;
+  font-size: .78rem;
+  font-weight: 680;
+}
+
+.app-shell.theme-dark .native-lock-row button:hover:not(:disabled) {
+  border-color: #456b82;
+  background: #102c42;
+  color: #eef5f9;
+}
+
+.app-shell.theme-dark .native-reserve-row button {
+  min-height: 32px;
+  padding: 5px 9px;
+  border-color: #355267;
+  border-radius: 6px;
+  background: #102c42;
+  color: #eef5f9;
+  font-size: .78rem;
+}
+
+.app-shell.theme-dark .native-reserve-row button:hover:not(:disabled) {
+  border-color: #6797b4;
+  background: #16364e;
+}
+
+.app-shell.theme-dark .native-panel-heading .native-danger {
+  background: transparent;
+  border-color: #7b4650;
+  color: #ff9ca1;
+}
+
+.app-shell.theme-dark .native-panel-heading .native-danger:hover:not(:disabled) {
+  background: rgba(255, 86, 93, .1);
+  border-color: #b96770;
 }
 
 /* Neo follows the flatter, square-cornered visual language used elsewhere in Coach Tools. */
@@ -530,6 +651,14 @@
 
   .native-lock-row > span {
     flex-basis: 100%;
+  }
+
+  .app-shell.theme-dark .native-squad-actions {
+    width: 100%;
+  }
+
+  .app-shell.theme-dark .native-squad-actions button {
+    flex: 1 1 auto;
   }
 }
 
