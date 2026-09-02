@@ -1,0 +1,4 @@
+.kdbc-print-status{margin-left:auto;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.kdbc-print-status strong{font-size:.75rem;letter-spacing:.08em}
+.kdbc-print-status span{font-size:.65rem;opacity:.72}
+@media print{.kdbc-print-status{display:flex!important}.print-brand-header img{display:none!important}}
