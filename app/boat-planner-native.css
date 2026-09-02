@@ -1,1 +1,540 @@
-.boat-planner-native{min-width:0}.native-squad-console{margin:18px 0 22px;border:1px solid var(--border,#28405a);border-radius:16px;background:var(--panel,#0d1b2a);overflow:hidden;color:inherit}.native-squad-topline{display:grid;grid-template-columns:minmax(180px,1.15fr) minmax(180px,.85fr) minmax(360px,2fr) minmax(150px,.7fr);gap:12px;align-items:end;padding:16px}.native-squad-heading span,.native-field>span,.native-panel-heading span{display:block;font-size:.7rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;opacity:.72}.native-squad-heading strong{display:block;font-size:1.05rem;margin-top:3px}.native-squad-heading small,.native-status small{display:block;margin-top:3px;opacity:.7}.native-field select,.native-roster-table select,.native-roster-table input[type=number]{width:100%;min-height:38px;border:1px solid var(--border,#36506c);border-radius:8px;background:var(--card,#12263a);color:inherit;padding:7px 9px;font:inherit}.native-squad-actions{display:flex;gap:7px;flex-wrap:wrap}.native-squad-actions button,.native-squad-summary button,.native-lock-row button,.native-panel-heading button,.native-reserve-row button{min-height:38px;border:1px solid var(--border,#36506c);border-radius:8px;background:transparent;color:inherit;padding:7px 10px;font:inherit;font-weight:700;cursor:pointer}.native-squad-actions button:disabled,.native-reserve-row button:disabled{opacity:.45;cursor:not-allowed}.native-status{justify-self:end;min-width:145px}.native-squad-summary{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:10px 16px 14px;border-top:1px solid var(--border,#28405a);background:rgba(255,255,255,.025)}.native-squad-summary>span{padding:6px 9px;border:1px solid var(--border,#28405a);border-radius:999px;font-size:.82rem}.native-squad-summary b{font-size:.95rem}.native-squad-summary .native-apply{margin-left:auto;background:var(--accent,#0b6e8a);border-color:transparent;color:#fff}.native-core-toggle{display:flex;gap:8px;align-items:center;padding:6px 9px;border:1px solid var(--border,#28405a);border-radius:10px}.native-core-toggle span,.native-core-toggle b,.native-core-toggle small{display:block}.native-core-toggle small{font-size:.72rem;opacity:.7}.native-lock-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--border,#28405a)}.native-lock-row>span{margin-right:auto}.native-lock-row b,.native-lock-row small{display:block}.native-lock-row small{opacity:.68;font-size:.75rem}.native-message{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;border-top:1px solid var(--border,#28405a);background:rgba(143,217,238,.07)}.native-message button{border:0;background:transparent;color:inherit;font-size:1.25rem;cursor:pointer}.native-panel{padding:16px;border-top:1px solid var(--border,#28405a)}.native-panel-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px}.native-panel-heading h3{margin:2px 0 0;font-size:1.05rem}.native-panel>p{margin:0 0 12px;opacity:.78;font-size:.86rem}.native-panel-heading .native-danger{border-color:#8a3b3b;color:#f4b4b4}.native-table-wrap{overflow-x:auto}.native-roster-table{width:100%;border-collapse:collapse;min-width:1050px}.native-roster-table th,.native-roster-table td{padding:9px;border-top:1px solid var(--border,#28405a);text-align:left;vertical-align:middle}.native-roster-table th{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;opacity:.72}.native-roster-table td:first-child strong,.native-roster-table td:first-child small{display:block}.native-roster-table td small{opacity:.68}.native-roster-table td:last-child input{max-width:85px}.native-role-chips{display:flex;gap:5px;flex-wrap:wrap;min-width:245px}.native-role-chips label{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid var(--border,#36506c);border-radius:999px;font-size:.74rem}.native-role-chips input{margin:0}.native-coach-today{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:.76rem}.native-reserve-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.native-reserve-grid section{border:1px solid var(--border,#28405a);border-radius:12px;padding:12px}.native-reserve-grid h4{margin:0 0 8px}.native-reserve-grid p{margin:6px 0;opacity:.72}.native-reserve-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--border,#28405a)}.native-reserve-row:first-of-type{border-top:0}.native-reserve-row strong,.native-reserve-row small{display:block}.native-reserve-row small{opacity:.68}.native-attendance{font-size:.78rem}.native-attendance.confirmed{color:#93d9a0}.native-attendance.unconfirmed{color:#e9c76f}.native-attendance.out{color:#ef9a9a}.native-panel-note{margin-top:12px!important}.native-race-day .boat-hero,.native-race-day .boat-display-switcher,.native-race-day .planner-setup-grid,.native-race-day .planner-build-row,.native-race-day .boat-profile,.native-race-day .trim-analysis,.native-race-day .planner-truth,.native-race-day .seat-reason{display:none!important}.native-race-day .native-squad-console{margin-bottom:10px}.native-race-day .lineup-section{margin-top:10px}@media(max-width:1050px){.native-squad-topline{grid-template-columns:1fr 1fr}.native-squad-actions{grid-column:1/-1}.native-status{justify-self:stretch}.native-reserve-grid{grid-template-columns:1fr}}@media(max-width:650px){.native-squad-topline{grid-template-columns:1fr}.native-squad-actions{grid-column:auto}.native-squad-summary .native-apply{margin-left:0;width:100%}.native-core-toggle{width:100%}.native-panel-heading{flex-direction:column}.native-reserve-row{grid-template-columns:1fr auto}.native-reserve-row button{grid-column:1/-1}.native-lock-row>span{flex-basis:100%}}@media print{.native-squad-console{display:none!important}}
+.boat-planner-native {
+  min-width: 0;
+}
+
+.native-squad-console {
+  --native-surface: var(--surface);
+  --native-surface-soft: var(--surface-soft);
+  --native-canvas: var(--canvas);
+  --native-line: var(--line);
+  --native-soft-line: var(--soft-line);
+  --native-text: var(--ink);
+  --native-muted: var(--muted);
+  --native-accent: var(--coral);
+  --native-accent-strong: var(--coral-dark);
+  --native-info: var(--blue-soft);
+  --native-success: #2f7754;
+  --native-warning: #8a6824;
+  --native-danger: #a34248;
+  --native-danger-soft: color-mix(in srgb, var(--native-danger) 10%, var(--native-surface));
+
+  margin: 18px 0 22px;
+  border: 1px solid var(--native-line);
+  border-radius: 16px;
+  background: var(--native-surface);
+  color: var(--native-text);
+  overflow: hidden;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.native-squad-topline {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.15fr) minmax(180px, .85fr) minmax(360px, 2fr) minmax(150px, .7fr);
+  gap: 12px;
+  align-items: end;
+  padding: 16px;
+}
+
+.native-squad-heading span,
+.native-field > span,
+.native-panel-heading span {
+  display: block;
+  color: var(--native-muted);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.native-squad-heading strong {
+  display: block;
+  color: var(--native-text);
+  font-size: 1.05rem;
+  margin-top: 3px;
+}
+
+.native-squad-heading small,
+.native-status small {
+  display: block;
+  color: var(--native-muted);
+  margin-top: 3px;
+}
+
+.native-field select,
+.native-roster-table select,
+.native-roster-table input[type="number"] {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--native-line);
+  border-radius: 8px;
+  background: var(--native-surface-soft);
+  color: var(--native-text);
+  padding: 7px 9px;
+  font: inherit;
+}
+
+.native-field select:focus-visible,
+.native-roster-table select:focus-visible,
+.native-roster-table input[type="number"]:focus-visible,
+.native-squad-console button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--native-accent) 75%, transparent);
+  outline-offset: 2px;
+}
+
+.native-squad-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.native-squad-actions button,
+.native-squad-summary button,
+.native-lock-row button,
+.native-panel-heading button,
+.native-reserve-row button {
+  min-height: 38px;
+  border: 1px solid var(--native-line);
+  border-radius: 8px;
+  background: var(--native-surface-soft);
+  color: var(--native-text);
+  padding: 7px 10px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.native-squad-actions button:hover:not(:disabled),
+.native-squad-summary button:hover:not(:disabled),
+.native-lock-row button:hover:not(:disabled),
+.native-panel-heading button:hover:not(:disabled),
+.native-reserve-row button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--native-accent) 8%, var(--native-surface));
+  border-color: color-mix(in srgb, var(--native-accent) 42%, var(--native-line));
+}
+
+.native-squad-actions button:disabled,
+.native-reserve-row button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.native-status {
+  justify-self: end;
+  min-width: 145px;
+}
+
+.native-squad-summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--native-line);
+  background: var(--native-canvas);
+}
+
+.native-squad-summary > span {
+  padding: 6px 9px;
+  border: 1px solid var(--native-line);
+  border-radius: 999px;
+  background: var(--native-surface);
+  color: var(--native-muted);
+  font-size: .82rem;
+}
+
+.native-squad-summary > span b {
+  color: var(--native-text);
+}
+
+.native-squad-summary b {
+  font-size: .95rem;
+}
+
+.native-squad-summary .native-apply {
+  margin-left: auto;
+  background: var(--native-accent);
+  border-color: var(--native-accent);
+  color: #fff;
+}
+
+.native-squad-summary .native-apply:hover:not(:disabled) {
+  background: var(--native-accent-strong);
+  border-color: var(--native-accent-strong);
+}
+
+.native-core-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 9px;
+  border: 1px solid var(--native-line);
+  border-radius: 10px;
+  background: var(--native-surface);
+}
+
+.native-core-toggle span,
+.native-core-toggle b,
+.native-core-toggle small {
+  display: block;
+}
+
+.native-core-toggle b {
+  color: var(--native-text);
+}
+
+.native-core-toggle small {
+  color: var(--native-muted);
+  font-size: .72rem;
+}
+
+.native-squad-console input[type="checkbox"] {
+  accent-color: var(--native-accent);
+}
+
+.native-lock-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-top: 1px solid var(--native-line);
+  background: var(--native-surface);
+}
+
+.native-lock-row > span {
+  margin-right: auto;
+}
+
+.native-lock-row b,
+.native-lock-row small {
+  display: block;
+}
+
+.native-lock-row b {
+  color: var(--native-text);
+}
+
+.native-lock-row small {
+  color: var(--native-muted);
+  font-size: .75rem;
+}
+
+.native-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid color-mix(in srgb, var(--native-accent) 24%, var(--native-line));
+  background: var(--native-info);
+  color: var(--native-text);
+}
+
+.native-message button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
+.native-panel {
+  padding: 16px;
+  border-top: 1px solid var(--native-line);
+  background: var(--native-surface);
+}
+
+.native-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.native-panel-heading h3 {
+  color: var(--native-text);
+  margin: 2px 0 0;
+  font-size: 1.05rem;
+}
+
+.native-panel > p {
+  margin: 0 0 12px;
+  color: var(--native-muted);
+  font-size: .86rem;
+}
+
+.native-panel-heading .native-danger {
+  border-color: color-mix(in srgb, var(--native-danger) 55%, var(--native-line));
+  background: var(--native-danger-soft);
+  color: var(--native-danger);
+}
+
+.native-panel-heading .native-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--native-danger) 16%, var(--native-surface));
+  border-color: var(--native-danger);
+}
+
+.native-table-wrap {
+  overflow-x: auto;
+}
+
+.native-roster-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1050px;
+}
+
+.native-roster-table th,
+.native-roster-table td {
+  padding: 9px;
+  border-top: 1px solid var(--native-soft-line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.native-roster-table th {
+  color: var(--native-muted);
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.native-roster-table td:first-child strong,
+.native-roster-table td:first-child small {
+  display: block;
+}
+
+.native-roster-table td:first-child strong {
+  color: var(--native-text);
+}
+
+.native-roster-table td small {
+  color: var(--native-muted);
+}
+
+.native-roster-table td:last-child input {
+  max-width: 85px;
+}
+
+.native-role-chips {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  min-width: 245px;
+}
+
+.native-role-chips label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  border: 1px solid var(--native-line);
+  border-radius: 999px;
+  background: var(--native-surface-soft);
+  color: var(--native-muted);
+  font-size: .74rem;
+}
+
+.native-role-chips label:has(input:checked) {
+  border-color: color-mix(in srgb, var(--native-accent) 48%, var(--native-line));
+  background: color-mix(in srgb, var(--native-accent) 9%, var(--native-surface));
+  color: var(--native-text);
+}
+
+.native-role-chips input {
+  margin: 0;
+}
+
+.native-coach-today {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--native-muted);
+  font-size: .76rem;
+}
+
+.native-reserve-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.native-reserve-grid section {
+  border: 1px solid var(--native-line);
+  border-radius: 12px;
+  background: var(--native-surface-soft);
+  padding: 12px;
+}
+
+.native-reserve-grid h4 {
+  color: var(--native-text);
+  margin: 0 0 8px;
+}
+
+.native-reserve-grid p {
+  margin: 6px 0;
+  color: var(--native-muted);
+}
+
+.native-reserve-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--native-soft-line);
+}
+
+.native-reserve-row:first-of-type {
+  border-top: 0;
+}
+
+.native-reserve-row strong,
+.native-reserve-row small {
+  display: block;
+}
+
+.native-reserve-row strong {
+  color: var(--native-text);
+}
+
+.native-reserve-row small {
+  color: var(--native-muted);
+}
+
+.native-attendance {
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.native-attendance.confirmed {
+  color: var(--native-success);
+}
+
+.native-attendance.unconfirmed {
+  color: var(--native-warning);
+}
+
+.native-attendance.out {
+  color: var(--native-danger);
+}
+
+.native-panel-note {
+  margin-top: 12px !important;
+}
+
+/* Dark theme keeps the same structure while lifting contrast for low-light dockside use. */
+.app-shell.theme-dark .native-squad-console {
+  --native-success: #8bd3a7;
+  --native-warning: #e4c36a;
+  --native-danger: #ff9298;
+  --native-danger-soft: color-mix(in srgb, #ff565d 12%, var(--surface));
+}
+
+.app-shell.theme-dark .native-field select,
+.app-shell.theme-dark .native-roster-table select,
+.app-shell.theme-dark .native-roster-table input[type="number"] {
+  color-scheme: dark;
+}
+
+/* Neo follows the flatter, square-cornered visual language used elsewhere in Coach Tools. */
+.app-shell.theme-neo .native-squad-console,
+.app-shell.theme-neo .native-core-toggle,
+.app-shell.theme-neo .native-reserve-grid section,
+.app-shell.theme-neo .native-field select,
+.app-shell.theme-neo .native-roster-table select,
+.app-shell.theme-neo .native-roster-table input[type="number"],
+.app-shell.theme-neo .native-squad-actions button,
+.app-shell.theme-neo .native-squad-summary button,
+.app-shell.theme-neo .native-lock-row button,
+.app-shell.theme-neo .native-panel-heading button,
+.app-shell.theme-neo .native-reserve-row button {
+  border-radius: 4px;
+}
+
+.app-shell.theme-neo .native-squad-console {
+  --native-success: #276446;
+  --native-warning: #775b19;
+  --native-danger: #a13c43;
+}
+
+.native-race-day .boat-hero,
+.native-race-day .boat-display-switcher,
+.native-race-day .planner-setup-grid,
+.native-race-day .planner-build-row,
+.native-race-day .boat-profile,
+.native-race-day .trim-analysis,
+.native-race-day .planner-truth,
+.native-race-day .seat-reason {
+  display: none !important;
+}
+
+.native-race-day .native-squad-console {
+  margin-bottom: 10px;
+}
+
+.native-race-day .lineup-section {
+  margin-top: 10px;
+}
+
+@media (max-width: 1050px) {
+  .native-squad-topline {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .native-squad-actions {
+    grid-column: 1 / -1;
+  }
+
+  .native-status {
+    justify-self: stretch;
+  }
+
+  .native-reserve-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .native-squad-topline {
+    grid-template-columns: 1fr;
+  }
+
+  .native-squad-actions {
+    grid-column: auto;
+  }
+
+  .native-squad-summary .native-apply {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .native-core-toggle {
+    width: 100%;
+  }
+
+  .native-panel-heading {
+    flex-direction: column;
+  }
+
+  .native-reserve-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .native-reserve-row button {
+    grid-column: 1 / -1;
+  }
+
+  .native-lock-row > span {
+    flex-basis: 100%;
+  }
+}
+
+@media print {
+  .native-squad-console {
+    display: none !important;
+  }
+}
