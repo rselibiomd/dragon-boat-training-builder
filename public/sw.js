@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kdbc-coach-tools-v8-stable-planner';
+const CACHE_NAME = 'kdbc-coach-tools-v9-native-squad-planner';
 const APP_ROOT = '/dragon-boat-training-builder/';
 const CORE = [
   APP_ROOT,
