@@ -1,0 +1,14 @@
+/* Boat Planner multi-role profile enhancements */
+.kdbc-role-cell{min-width:250px}
+.kdbc-role-chips{display:flex;flex-wrap:wrap;gap:6px}
+.kdbc-role-chip{display:inline-flex;align-items:center;gap:5px;min-height:30px;padding:4px 8px;border:1px solid var(--border,#36506c);border-radius:999px;font-size:.76rem;cursor:pointer;background:rgba(255,255,255,.025)}
+.kdbc-role-chip input{margin:0;accent-color:var(--accent,#0b6e8a)}
+.kdbc-role-chip:has(input:checked){background:rgba(143,217,238,.1);border-color:rgba(143,217,238,.55)}
+.kdbc-today-role{min-width:170px}
+.kdbc-today-role select{width:100%;min-height:36px;border:1px solid var(--border,#36506c);border-radius:8px;background:var(--card,#12263a);color:inherit;padding:6px 8px;font:inherit}
+.kdbc-coach-today{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:.76rem;opacity:.85}
+.kdbc-role-note{display:block;margin-top:5px;font-size:.7rem;opacity:.65;line-height:1.25}
+.kdbc-role-summary{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+.kdbc-role-summary span{padding:3px 6px;border-radius:999px;border:1px solid var(--border,#36506c);font-size:.69rem;opacity:.82}
+@media(max-width:700px){.kdbc-role-cell{min-width:220px}.kdbc-today-role{min-width:150px}}
+@media print{.kdbc-role-cell,.kdbc-today-role{display:none!important}}
