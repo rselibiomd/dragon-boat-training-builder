@@ -1,0 +1,117 @@
+.native-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 18px 0 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.native-mode-bar > div {
+  min-width: 0;
+}
+
+.native-mode-bar span,
+.native-mode-bar strong,
+.native-mode-bar small {
+  display: block;
+}
+
+.native-mode-bar span {
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.native-mode-bar strong {
+  margin-top: 2px;
+  font-size: 1rem;
+}
+
+.native-mode-bar small {
+  margin-top: 3px;
+  max-width: 760px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.native-mode-bar button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.native-mode-bar button:hover {
+  border-color: color-mix(in srgb, var(--coral) 42%, var(--line));
+  background: color-mix(in srgb, var(--coral) 7%, var(--surface));
+}
+
+.native-mode-bar button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--coral) 75%, transparent);
+  outline-offset: 2px;
+}
+
+.native-mode-bar.is-roster-mode {
+  border-left: 4px solid var(--coral);
+}
+
+.native-mode-bar.is-squad-mode {
+  border-left: 4px solid var(--coral);
+  margin-bottom: 8px;
+}
+
+.native-mode-bar.is-squad-mode + .native-squad-console {
+  margin-top: 8px;
+}
+
+.app-shell.theme-dark .native-mode-bar {
+  background: #0b2234;
+  border-color: #294255;
+}
+
+.app-shell.theme-dark .native-mode-bar button {
+  border-color: #294255;
+  background: #102c42;
+  color: #eef5f9;
+}
+
+.app-shell.theme-dark .native-mode-bar button:hover {
+  border-color: #456b82;
+  background: #16364e;
+}
+
+.app-shell.theme-neo .native-mode-bar,
+.app-shell.theme-neo .native-mode-bar button {
+  border-radius: 0;
+}
+
+@media (max-width: 720px) {
+  .native-mode-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .native-mode-bar button {
+    width: 100%;
+  }
+}
+
+@media print {
+  .native-mode-bar {
+    display: none !important;
+  }
+}
