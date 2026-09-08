@@ -46,7 +46,7 @@ async function nextPaint() {
 }
 
 async function findPages(selector: string) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
     const pages = [...document.querySelectorAll<HTMLElement>(selector)];
     if (pages.length) return pages;
     await nextPaint();
@@ -71,7 +71,7 @@ async function renderPage(page: HTMLElement, orientation: PrintOrientation) {
   frame.tabIndex = -1;
   Object.assign(frame.style, {
     border: "0",
-    height: "1px",
+    height: `${size.height}in`,
     left: "-200vw",
     opacity: "0",
     pointerEvents: "none",
@@ -86,16 +86,21 @@ async function renderPage(page: HTMLElement, orientation: PrintOrientation) {
     if (!frameDocument) throw new Error("The export workspace could not be created.");
     frameDocument.open();
     frameDocument.write(`<!doctype html><html><head><meta charset="utf-8"><base href="${document.baseURI}"><style>
-      html, body { background: #fff !important; color: #102437; font-family: Arial, Helvetica, sans-serif; margin: 0 !important; padding: 0 !important; }
+      html, body { background: #fff !important; color: #102437 !important; font-family: Arial, Helvetica, sans-serif; margin: 0 !important; padding: 0 !important; }
       *, *::before, *::after { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       ${exportStyles()}
+      .print-document, .boat-print-document { display: block !important; height: auto !important; min-height: 0 !important; overflow: visible !important; visibility: visible !important; }
       .export-document-page {
         break-after: auto !important;
         display: block !important;
+        height: auto !important;
         margin: 0 !important;
+        min-height: 0 !important;
         overflow: visible !important;
         padding-bottom: 0.08in !important;
         page-break-after: auto !important;
+        position: relative !important;
+        visibility: visible !important;
         width: ${contentWidth}in !important;
       }
     </style></head><body></body></html>`);
@@ -103,27 +108,44 @@ async function renderPage(page: HTMLElement, orientation: PrintOrientation) {
 
     const clone = page.cloneNode(true) as HTMLElement;
     clone.classList.add("export-document-page");
+    clone.style.setProperty("display", "block", "important");
+    clone.style.setProperty("height", "auto", "important");
+    clone.style.setProperty("min-height", "0", "important");
+    clone.style.setProperty("overflow", "visible", "important");
+    clone.style.setProperty("position", "relative", "important");
+    clone.style.setProperty("visibility", "visible", "important");
+    clone.style.setProperty("width", `${contentWidth}in`, "important");
+
     const sourceImages = [...page.querySelectorAll("img")];
     [...clone.querySelectorAll("img")].forEach((image, index) => {
       image.src = sourceImages[index]?.currentSrc || sourceImages[index]?.src || image.src;
     });
+
     const printDocument = page.closest<HTMLElement>(".print-document");
     const wrapper = frameDocument.createElement("section");
     wrapper.className = printDocument?.className ?? "print-document";
-    wrapper.style.display = "block";
+    wrapper.style.setProperty("display", "block", "important");
+    wrapper.style.setProperty("height", "auto", "important");
+    wrapper.style.setProperty("min-height", "0", "important");
+    wrapper.style.setProperty("overflow", "visible", "important");
+    wrapper.style.setProperty("visibility", "visible", "important");
     wrapper.appendChild(clone);
     frameDocument.body.appendChild(wrapper);
+
     await frameDocument.fonts?.ready;
     await waitForImages(clone);
     await new Promise<void>((resolve) => frame.contentWindow?.requestAnimationFrame(() => frame.contentWindow?.requestAnimationFrame(() => resolve())) ?? resolve());
+
+    const renderedHeight = Math.max(clone.scrollHeight, clone.offsetHeight, 900);
+    frame.style.height = `${renderedHeight}px`;
 
     return await html2canvas(clone, {
       backgroundColor: "#ffffff",
       logging: false,
       scale: 2,
       useCORS: true,
-      windowHeight: Math.max(clone.scrollHeight, clone.offsetHeight),
-      windowWidth: Math.max(clone.scrollWidth, clone.offsetWidth),
+      windowHeight: renderedHeight,
+      windowWidth: Math.max(clone.scrollWidth, clone.offsetWidth, Math.round(contentWidth * 96)),
     });
   } finally {
     frame.remove();
@@ -152,19 +174,28 @@ function placeOnLetterPage(content: HTMLCanvasElement, orientation: PrintOrienta
   return page;
 }
 
-async function downloadPng(canvas: HTMLCanvasElement, filename: string) {
-  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("The PNG could not be created.")), "image/png"));
+async function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  link.rel = "noopener";
+  document.body.appendChild(link);
   link.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 2_000);
+}
+
+async function downloadPng(canvas: HTMLCanvasElement, filename: string) {
+  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("The PNG could not be created.")), "image/png"));
+  await downloadBlob(blob, filename);
 }
 
 export async function exportPrintPages({ filename, format, orientation, pageSelector }: ExportPrintPagesOptions) {
   await nextPaint();
   const sourcePages = await findPages(pageSelector);
+  if (!sourcePages.length) throw new Error("No printable pages were found.");
+
   const renderedPages: HTMLCanvasElement[] = [];
   for (const sourcePage of sourcePages) {
     renderedPages.push(placeOnLetterPage(await renderPage(sourcePage, orientation), orientation));
@@ -188,6 +219,8 @@ export async function exportPrintPages({ filename, format, orientation, pageSele
   while (pdf.getNumberOfPages() > renderedPages.length) {
     pdf.deletePage(pdf.getNumberOfPages());
   }
-  pdf.save(`${safeName}.pdf`);
+
+  const pdfBlob = pdf.output("blob");
+  await downloadBlob(pdfBlob, `${safeName}.pdf`);
   return renderedPages.length;
 }
