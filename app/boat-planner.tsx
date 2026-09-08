@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { ConsoleTheme } from "./page";
 import BoatPlannerCore from "./boat-planner-core";
 import "./boat-planner-native.css";
 import "./boat-planner-quick-roster.css";
+import "./boat-planner-mode.css";
 
 type BoatPlannerProps = {
   theme: ConsoleTheme;
@@ -74,6 +75,11 @@ type StoredDraft = {
   [key: string]: unknown;
 };
 type LineupStatusRecord = { status: LineupStatus; at: string };
+type SquadPlannerBackup = {
+  roster: StoredPaddler[];
+  draft: StoredDraft | null;
+  savedAt: string;
+};
 
 const ROSTER_KEY = "kdbc-boat-roster-v1";
 const DRAFT_KEY = "kdbc-boat-draft-v1";
@@ -83,6 +89,8 @@ const SESSION_STATES_KEY = "kdbc-squad-session-state-v1";
 const CLUB_ROLES_KEY = "kdbc-club-roles-native-v1";
 const LINEUP_STATUS_KEY = "kdbc-lineup-status-v1";
 const OLD_MULTI_ROLE_KEY = "kdbc-multi-role-session-v1";
+const SQUAD_MODE_ACTIVE_KEY = "kdbc-squad-mode-active-v1";
+const SQUAD_BACKUP_KEY = "kdbc-roster-before-squad-v1";
 const OTHER_SQUAD_ROLES: SquadRoleOption[] = ["None", "Reserve", "Waitlist", "Development", "Inactive"];
 const CLUB_ROLES: ClubRole[] = ["Paddler", "Coach", "Drummer", "Steer"];
 const ATTENDANCE_BUTTONS: Array<{ value: Attendance; symbol: string; short: string }> = [
@@ -102,6 +110,24 @@ function readStorage<T>(key: string, fallback: T): T {
 
 function writeStorage(key: string, value: unknown) {
   window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function clearSquadModeStorage() {
+  window.localStorage.removeItem(SQUAD_MODE_ACTIVE_KEY);
+  window.localStorage.removeItem(SQUAD_BACKUP_KEY);
+}
+
+function restoreRosterBackup() {
+  const backup = readStorage<SquadPlannerBackup | null>(SQUAD_BACKUP_KEY, null);
+  if (!backup) {
+    clearSquadModeStorage();
+    return null;
+  }
+  writeStorage(ROSTER_KEY, backup.roster);
+  if (backup.draft) writeStorage(DRAFT_KEY, backup.draft);
+  else window.localStorage.removeItem(DRAFT_KEY);
+  clearSquadModeStorage();
+  return backup;
 }
 
 function inferClubRoles(p: StoredPaddler): ClubRole[] {
@@ -161,6 +187,7 @@ export default function BoatPlanner(props: BoatPlannerProps) {
   const [lineupStatuses, setLineupStatuses] = useState<Record<string, LineupStatusRecord>>({});
   const [panel, setPanel] = useState<Panel>("");
   const [raceDay, setRaceDay] = useState(false);
+  const [squadMode, setSquadMode] = useState(false);
   const [plannerVersion, setPlannerVersion] = useState(0);
   const [buildFromSquadPending, setBuildFromSquadPending] = useState(false);
   const [message, setMessage] = useState("");
@@ -187,6 +214,8 @@ export default function BoatPlanner(props: BoatPlannerProps) {
   }
 
   useEffect(() => {
+    if (window.localStorage.getItem(SQUAD_MODE_ACTIVE_KEY) === "1") restoreRosterBackup();
+
     const storedRoster = readStorage<StoredPaddler[]>(ROSTER_KEY, []);
     const storedDraft = readStorage<StoredDraft | null>(DRAFT_KEY, null);
     const nextRoster = storedRoster.length ? storedRoster : Array.isArray(storedDraft?.paddlers) ? storedDraft.paddlers : [];
@@ -202,12 +231,14 @@ export default function BoatPlanner(props: BoatPlannerProps) {
       const existing = nextSessions[nativeKey] ?? { attendance: {}, activated: {}, assignments: {} };
       if (!Object.keys(existing.assignments || {}).length) nextSessions[nativeKey] = { ...existing, assignments: oldAssignments[sessionLabel] };
     }
+
     setRoster(nextRoster);
     setSquads(nextSquads);
     setActiveSquadId(nextActive);
     setClubRoles(nextRoles);
     setSessionStates(nextSessions);
     setLineupStatuses(readStorage<Record<string, LineupStatusRecord>>(LINEUP_STATUS_KEY, {}));
+    setSquadMode(false);
     setHydrated(true);
   }, [props.sessionDate, props.sessionTitle, sessionLabel]);
 
@@ -216,6 +247,7 @@ export default function BoatPlanner(props: BoatPlannerProps) {
   useEffect(() => { if (hydrated) writeStorage(SESSION_STATES_KEY, sessionStates); }, [hydrated, sessionStates]);
   useEffect(() => { if (hydrated) writeStorage(CLUB_ROLES_KEY, clubRoles); }, [clubRoles, hydrated]);
   useEffect(() => { if (hydrated) writeStorage(LINEUP_STATUS_KEY, lineupStatuses); }, [hydrated, lineupStatuses]);
+
   useEffect(() => {
     const onFocus = () => refreshRoster();
     window.addEventListener("focus", onFocus);
@@ -223,7 +255,7 @@ export default function BoatPlanner(props: BoatPlannerProps) {
   }, []);
 
   useEffect(() => {
-    if (!buildFromSquadPending) return;
+    if (!squadMode || !buildFromSquadPending) return;
     const timer = window.setTimeout(() => {
       const buildButton = document.querySelector<HTMLButtonElement>(".planner-build-row > button");
       if (!buildButton || buildButton.disabled) {
@@ -236,7 +268,32 @@ export default function BoatPlanner(props: BoatPlannerProps) {
       setBuildFromSquadPending(false);
     }, 120);
     return () => window.clearTimeout(timer);
-  }, [buildFromSquadPending, plannerVersion, activeSquad?.name]);
+  }, [buildFromSquadPending, plannerVersion, activeSquad?.name, squadMode]);
+
+  function enableSquadMode() {
+    const backup: SquadPlannerBackup = {
+      roster: readStorage<StoredPaddler[]>(ROSTER_KEY, []),
+      draft: readStorage<StoredDraft | null>(DRAFT_KEY, null),
+      savedAt: new Date().toISOString(),
+    };
+    writeStorage(SQUAD_BACKUP_KEY, backup);
+    window.localStorage.setItem(SQUAD_MODE_ACTIVE_KEY, "1");
+    setSquadMode(true);
+    setMessage("Squad Mode is on. Squad settings will control the next Squad build until you return to Roster & Attendance.");
+  }
+
+  function disableSquadMode() {
+    const backup = restoreRosterBackup();
+    setSquadMode(false);
+    setPanel("");
+    setRaceDay(false);
+    setBuildFromSquadPending(false);
+    setMessage("");
+    clearRosterSearch();
+    if (backup) setRoster(backup.roster);
+    else refreshRoster();
+    setPlannerVersion((value) => value + 1);
+  }
 
   function rolesFor(id: string) {
     const p = rosterMap.get(id);
@@ -405,6 +462,7 @@ export default function BoatPlanner(props: BoatPlannerProps) {
   }
 
   function applySquadToPlanner(buildNow = false) {
+    if (!squadMode) return setMessage("Turn on Squad Mode before building from a Squad.");
     if (!activeSquad) return setMessage("Create or select a Squad first.");
     const currentRoster = readStorage<StoredPaddler[]>(ROSTER_KEY, roster);
     const nextRoster = currentRoster.map((p) => {
@@ -512,7 +570,7 @@ export default function BoatPlanner(props: BoatPlannerProps) {
     setPanel((current) => current === next ? "" : next);
   }
 
-  function submitRosterSearch(event: React.FormEvent<HTMLFormElement>) {
+  function submitRosterSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setRosterSearch(searchDraft.trim());
   }
@@ -556,232 +614,233 @@ export default function BoatPlanner(props: BoatPlannerProps) {
   );
 
   return (
-    <div className={`boat-planner-native ${raceDay ? "native-race-day" : ""}`}>
-      <section className="native-squad-console" aria-label="Squad and role planner">
-        <div className="native-squad-topline">
-          <div className="native-squad-heading">
-            <span>Squad / Team</span>
-            <strong>{activeSquad?.name || "No squad selected"}</strong>
-            <small>{activeSquad ? `${stats.core} Core · ${stats.reserves} Reserves · ${stats.waitlist} Waitlist` : "Create a fixed team from the club roster"}</small>
-          </div>
-
-          <label className="native-field">
-            <span>Squad</span>
-            <select value={activeSquadId} onChange={(e) => { setActiveSquadId(e.target.value); setPanel(""); clearRosterSearch(); refreshRoster(); }}>
-              <option value="">Choose squad...</option>
-              {squads.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </label>
-
-          <div className="native-squad-actions">
-            <button type="button" onClick={createSquad}>+ New squad</button>
-            <button type="button" disabled={!activeSquad} onClick={() => togglePanel("roster")}>Quick roster</button>
-            <button type="button" disabled={!activeSquad} onClick={() => togglePanel("reserves")}>Reserve desk</button>
-            <button type="button" onClick={() => setRaceDay((v) => !v)}>{raceDay ? "Exit race day" : "Race day"}</button>
-            <button type="button" onClick={refreshRoster}>Refresh roster</button>
-          </div>
-
-          <label className="native-field native-status">
-            <span>Lineup</span>
-            <select value={lineupStatus.status} onChange={(e) => setLineupStatuses((current) => ({ ...current, [sessionKey]: { status: e.target.value as LineupStatus, at: new Date().toISOString() } }))}>
-              <option>Draft</option>
-              <option>Final</option>
-              <option>Revised</option>
-            </select>
-            <small>{formatStamp(lineupStatus.at)}</small>
-          </label>
+    <div className={`boat-planner-native ${raceDay && squadMode ? "native-race-day" : ""}`}>
+      <section className={`native-mode-bar ${squadMode ? "is-squad-mode" : "is-roster-mode"}`} aria-label="Boat planner source mode">
+        <div>
+          <span>Boat source</span>
+          <strong>{squadMode ? "Squad Mode" : "Roster & Attendance"}</strong>
+          <small>{squadMode
+            ? "The selected Squad controls who is available for a Squad build. Your normal roster is preserved until you leave Squad Mode."
+            : "Default mode. The regular Roster & Attendance settings below control who is available to build the boat."}</small>
         </div>
-
-        {activeSquad && <>
-          <div className="native-squad-summary">
-            <span><b>{stats.coreConfirmed}/{stats.core}</b> Core confirmed</span>
-            <span><b>{stats.coreUnconfirmed}</b> Core unconfirmed</span>
-            <span><b>{stats.coreOut}</b> Core out</span>
-            <span><b>{stats.reserveActive}/{stats.reserveConfirmed}</b> confirmed reserves active</span>
-            <label className="native-core-toggle">
-              <input type="checkbox" checked={activeSquad.coreFirst} onChange={(e) => setCoreFirst(e.target.checked)} />
-              <span><b>Core-first</b><small>{activeSquad.coreFirst ? "Only Core plus activated Reserves enter paddling seats" : "Practice pool includes confirmed Core, Reserve, and Development paddlers"}</small></span>
-            </label>
-            <button className="native-apply" type="button" onClick={() => applySquadToPlanner(true)}>Build boat from squad →</button>
-          </div>
-
-          <div className="native-lock-row">
-            <span><b>Quick locks</b><small>Use these after the Squad lineup is built to protect key seats during adjustments.</small></span>
-            <button type="button" onClick={() => updateLocks("lead")}>Lock lead pair</button>
-            <button type="button" onClick={() => updateLocks("front")}>Lock front 3</button>
-            <button type="button" onClick={() => updateLocks("all")}>Lock boat</button>
-            <button type="button" onClick={() => updateLocks("unlock")}>Unlock all</button>
-          </div>
-        </>}
-
-        {message && <div className="native-message" role="status"><span>{message}</span><button type="button" aria-label="Dismiss message" onClick={() => setMessage("")}>×</button></div>}
-
-        {panel === "roster" && activeSquad && (
-          <div className="native-panel">
-            <div className="native-panel-heading">
-              <div><span>Quick roster</span><h3>Squad membership, roles, and today&apos;s assignment</h3></div>
-              <button className="native-danger" type="button" onClick={deleteSquad}>Delete squad</button>
-            </div>
-            <p>Use the check controls for the things you change most often. Detailed Squad statuses and roles are still available when needed.</p>
-
-            <form className="native-roster-search" onSubmit={submitRosterSearch}>
-              <label>
-                <span>Find paddler</span>
-                <input
-                  type="search"
-                  value={searchDraft}
-                  onChange={(e) => setSearchDraft(e.target.value)}
-                  placeholder="Search name, squad status, or role"
-                  autoComplete="off"
-                />
-              </label>
-              <button className="native-search-button" type="submit">Search</button>
-              {rosterSearch && <button className="native-clear-search" type="button" onClick={clearRosterSearch}>Clear</button>}
-              <small>{filteredRoster.length} of {sortedRoster.length} paddlers shown</small>
-            </form>
-
-            <div className="native-table-wrap">
-              <table className="native-roster-table">
-                <thead>
-                  <tr>
-                    <th>Paddler</th>
-                    <th>Squad status</th>
-                    <th>Attendance</th>
-                    <th>Club roles</th>
-                    <th>Today</th>
-                    <th>Reserve priority</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRoster.map((p) => {
-                    const member = activeSquad.members[p.id];
-                    const squadRole: SquadRoleOption = member ? member.role : "None";
-                    const roles = rolesFor(p.id);
-                    const a = assignmentFor(p.id);
-                    const attendance = attendanceFor(p.id);
-                    const physicalOptions = (["Paddler", "Drummer", "Steer"] as PhysicalRole[])
-                      .filter((role) => roles.includes(role as ClubRole))
-                      .concat("Off-boat");
-                    const nonCoreStatus = squadRole === "Core" ? "None" : squadRole;
-
-                    return (
-                      <tr key={p.id}>
-                        <td>
-                          <strong>{p.name}</strong>
-                          <small>{p.sideExclusive ? `${p.sidePref} only` : `Pref ${p.sidePref || "Either"}`}{p.weightKg ? ` · ${p.weightKg} kg` : ""}</small>
-                        </td>
-                        <td>
-                          <div className="native-squad-role-control">
-                            <label className={`native-core-check ${squadRole === "Core" ? "is-active" : ""}`}>
-                              <input type="checkbox" checked={squadRole === "Core"} onChange={(e) => toggleCore(p.id, e.target.checked)} />
-                              <span><b>✓</b> Core</span>
-                            </label>
-                            <select aria-label={`${p.name} non-core squad status`} value={nonCoreStatus} disabled={squadRole === "Core"} onChange={(e) => setSquadRole(p.id, e.target.value as SquadRoleOption)}>
-                              {OTHER_SQUAD_ROLES.map((role) => <option key={role}>{role}</option>)}
-                            </select>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="native-attendance-buttons" role="group" aria-label={`${p.name} attendance`}>
-                            {ATTENDANCE_BUTTONS.map((item) => (
-                              <button
-                                key={item.value}
-                                type="button"
-                                className={`${item.value.toLowerCase()} ${attendance === item.value ? "is-active" : ""}`}
-                                disabled={squadRole === "None" || squadRole === "Inactive"}
-                                onClick={() => setAttendance(p.id, item.value)}
-                                aria-pressed={attendance === item.value}
-                                title={item.value}
-                              >
-                                <b>{item.symbol}</b><span>{item.short}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </td>
-                        <td>
-                          <div className="native-role-chips">
-                            {CLUB_ROLES.map((role) => (
-                              <label key={role}>
-                                <input type="checkbox" checked={roles.includes(role)} onChange={(e) => setClubRole(p.id, role, e.target.checked)} />
-                                <span>{role}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </td>
-                        <td>
-                          <select value={a.physicalRole} onChange={(e) => setTodayRole(p.id, e.target.value as PhysicalRole)}>
-                            {physicalOptions.map((role) => <option key={role}>{role}</option>)}
-                          </select>
-                          {roles.includes("Coach") && (
-                            <label className="native-coach-today">
-                              <input type="checkbox" checked={a.coachToday} onChange={(e) => setCoachToday(p.id, e.target.checked)} />
-                              <span>Coach today</span>
-                            </label>
-                          )}
-                        </td>
-                        <td>
-                          <input
-                            aria-label={`${p.name} reserve priority`}
-                            disabled={squadRole !== "Reserve"}
-                            min="1"
-                            type="number"
-                            value={member?.priority ?? ""}
-                            onChange={(e) => setReservePriority(p.id, e.target.value)}
-                            placeholder="-"
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {!filteredRoster.length && (
-                    <tr><td className="native-no-results" colSpan={6}>No paddlers match “{rosterSearch}”.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {panel === "reserves" && activeSquad && (
-          <div className="native-panel native-reserve-panel">
-            <div className="native-panel-heading"><div><span>Reserve desk</span><h3>Resolve Core availability before building the boat</h3></div></div>
-            <div className="native-reserve-grid">
-              <section>
-                <h4>Core issues</h4>
-                {unresolvedCore.length
-                  ? unresolvedCore.map(([id]) => {
-                      const p = rosterMap.get(id);
-                      const a = assignmentFor(id);
-                      const attendance = attendanceFor(id);
-                      return <div className="native-reserve-row" key={id}><div><strong>{p?.name}</strong><small>{attendance !== "Confirmed" ? attendance : `${a.physicalRole} today, so a paddling spot opens`}</small></div></div>;
-                    })
-                  : <p>All Core paddlers are confirmed and assigned to paddling seats.</p>}
-              </section>
-              <section>
-                <h4>Reserves</h4>
-                {reserveMembers.length
-                  ? reserveMembers.map(([id, member]) => {
-                      const p = rosterMap.get(id);
-                      const attendance = attendanceFor(id);
-                      const a = assignmentFor(id);
-                      const active = Boolean(sessionState.activated[id]);
-                      return (
-                        <div className="native-reserve-row" key={id}>
-                          <div><strong>{p?.name}</strong><small>{member?.priority ? `Priority ${member.priority}` : "No fixed priority"} · {a.physicalRole} today</small></div>
-                          <span className={`native-attendance ${attendance.toLowerCase()}`}>{attendance}</span>
-                          <button disabled={attendance !== "Confirmed" || a.physicalRole !== "Paddler" || !activeSquad.coreFirst} type="button" onClick={() => toggleReserve(id)}>{active ? "Deactivate" : "Activate"}</button>
-                        </div>
-                      );
-                    })
-                  : <p>No Reserves assigned to this squad.</p>}
-              </section>
-            </div>
-            {activeSquad.coreFirst && <p className="native-panel-note">Open Core paddling spots remaining: <b>{stats.openCoreSpots}</b>. Confirmed Core paddlers are never displaced automatically by a Reserve.</p>}
-          </div>
-        )}
+        <button type="button" onClick={squadMode ? disableSquadMode : enableSquadMode}>
+          {squadMode ? "Return to Roster & Attendance" : "Use Squad Mode"}
+        </button>
       </section>
 
-      <BoatPlannerCore key={plannerVersion} {...props} />
+      {squadMode && (
+        <section className="native-squad-console" aria-label="Squad and role planner">
+          <div className="native-squad-topline">
+            <div className="native-squad-heading">
+              <span>Squad / Team</span>
+              <strong>{activeSquad?.name || "No squad selected"}</strong>
+              <small>{activeSquad ? `${stats.core} Core · ${stats.reserves} Reserves · ${stats.waitlist} Waitlist` : "Create a fixed team from the club roster"}</small>
+            </div>
+
+            <label className="native-field">
+              <span>Squad</span>
+              <select value={activeSquadId} onChange={(e) => { setActiveSquadId(e.target.value); setPanel(""); clearRosterSearch(); refreshRoster(); }}>
+                <option value="">Choose squad...</option>
+                {squads.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </label>
+
+            <div className="native-squad-actions">
+              <button type="button" onClick={createSquad}>+ New squad</button>
+              <button type="button" disabled={!activeSquad} onClick={() => togglePanel("roster")}>Quick roster</button>
+              <button type="button" disabled={!activeSquad} onClick={() => togglePanel("reserves")}>Reserve desk</button>
+              <button type="button" onClick={() => setRaceDay((v) => !v)}>{raceDay ? "Exit race day" : "Race day"}</button>
+              <button type="button" onClick={refreshRoster}>Refresh roster</button>
+            </div>
+
+            <label className="native-field native-status">
+              <span>Lineup</span>
+              <select value={lineupStatus.status} onChange={(e) => setLineupStatuses((current) => ({ ...current, [sessionKey]: { status: e.target.value as LineupStatus, at: new Date().toISOString() } }))}>
+                <option>Draft</option>
+                <option>Final</option>
+                <option>Revised</option>
+              </select>
+              <small>{formatStamp(lineupStatus.at)}</small>
+            </label>
+          </div>
+
+          {activeSquad && <>
+            <div className="native-squad-summary">
+              <span><b>{stats.coreConfirmed}/{stats.core}</b> Core confirmed</span>
+              <span><b>{stats.coreUnconfirmed}</b> Core unconfirmed</span>
+              <span><b>{stats.coreOut}</b> Core out</span>
+              <span><b>{stats.reserveActive}/{stats.reserveConfirmed}</b> confirmed reserves active</span>
+              <label className="native-core-toggle">
+                <input type="checkbox" checked={activeSquad.coreFirst} onChange={(e) => setCoreFirst(e.target.checked)} />
+                <span><b>Core-first</b><small>{activeSquad.coreFirst ? "Only Core plus activated Reserves enter paddling seats" : "Practice pool includes confirmed Core, Reserve, and Development paddlers"}</small></span>
+              </label>
+              <button className="native-apply" type="button" onClick={() => applySquadToPlanner(true)}>Build boat from squad →</button>
+            </div>
+
+            <div className="native-lock-row">
+              <span><b>Quick locks</b><small>Use these after the Squad lineup is built to protect key seats during adjustments.</small></span>
+              <button type="button" onClick={() => updateLocks("lead")}>Lock lead pair</button>
+              <button type="button" onClick={() => updateLocks("front")}>Lock front 3</button>
+              <button type="button" onClick={() => updateLocks("all")}>Lock boat</button>
+              <button type="button" onClick={() => updateLocks("unlock")}>Unlock all</button>
+            </div>
+          </>}
+
+          {message && <div className="native-message" role="status"><span>{message}</span><button type="button" aria-label="Dismiss message" onClick={() => setMessage("")}>×</button></div>}
+
+          {panel === "roster" && activeSquad && (
+            <div className="native-panel">
+              <div className="native-panel-heading">
+                <div><span>Quick roster</span><h3>Squad membership, roles, and today&apos;s assignment</h3></div>
+                <button className="native-danger" type="button" onClick={deleteSquad}>Delete squad</button>
+              </div>
+              <p>Use the check controls for the things you change most often. Detailed Squad statuses and roles are still available when needed.</p>
+
+              <form className="native-roster-search" onSubmit={submitRosterSearch}>
+                <label>
+                  <span>Find paddler</span>
+                  <input type="search" value={searchDraft} onChange={(e) => setSearchDraft(e.target.value)} placeholder="Search name, squad status, or role" autoComplete="off" />
+                </label>
+                <button className="native-search-button" type="submit">Search</button>
+                {rosterSearch && <button className="native-clear-search" type="button" onClick={clearRosterSearch}>Clear</button>}
+                <small>{filteredRoster.length} of {sortedRoster.length} paddlers shown</small>
+              </form>
+
+              <div className="native-table-wrap">
+                <table className="native-roster-table">
+                  <thead>
+                    <tr>
+                      <th>Paddler</th>
+                      <th>Squad status</th>
+                      <th>Attendance</th>
+                      <th>Club roles</th>
+                      <th>Today</th>
+                      <th>Reserve priority</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRoster.map((p) => {
+                      const member = activeSquad.members[p.id];
+                      const squadRole: SquadRoleOption = member ? member.role : "None";
+                      const roles = rolesFor(p.id);
+                      const a = assignmentFor(p.id);
+                      const attendance = attendanceFor(p.id);
+                      const physicalOptions = (["Paddler", "Drummer", "Steer"] as PhysicalRole[])
+                        .filter((role) => roles.includes(role as ClubRole))
+                        .concat("Off-boat");
+                      const nonCoreStatus = squadRole === "Core" ? "None" : squadRole;
+
+                      return (
+                        <tr key={p.id}>
+                          <td>
+                            <strong>{p.name}</strong>
+                            <small>{p.sideExclusive ? `${p.sidePref} only` : `Pref ${p.sidePref || "Either"}`}{p.weightKg ? ` · ${p.weightKg} kg` : ""}</small>
+                          </td>
+                          <td>
+                            <div className="native-squad-role-control">
+                              <label className={`native-core-check ${squadRole === "Core" ? "is-active" : ""}`}>
+                                <input type="checkbox" checked={squadRole === "Core"} onChange={(e) => toggleCore(p.id, e.target.checked)} />
+                                <span><b>✓</b> Core</span>
+                              </label>
+                              <select aria-label={`${p.name} non-core squad status`} value={nonCoreStatus} disabled={squadRole === "Core"} onChange={(e) => setSquadRole(p.id, e.target.value as SquadRoleOption)}>
+                                {OTHER_SQUAD_ROLES.map((role) => <option key={role}>{role}</option>)}
+                              </select>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="native-attendance-buttons" role="group" aria-label={`${p.name} attendance`}>
+                              {ATTENDANCE_BUTTONS.map((item) => (
+                                <button
+                                  key={item.value}
+                                  type="button"
+                                  className={`${item.value.toLowerCase()} ${attendance === item.value ? "is-active" : ""}`}
+                                  disabled={squadRole === "None" || squadRole === "Inactive"}
+                                  onClick={() => setAttendance(p.id, item.value)}
+                                  aria-pressed={attendance === item.value}
+                                  title={item.value}
+                                >
+                                  <b>{item.symbol}</b><span>{item.short}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="native-role-chips">
+                              {CLUB_ROLES.map((role) => (
+                                <label key={role}>
+                                  <input type="checkbox" checked={roles.includes(role)} onChange={(e) => setClubRole(p.id, role, e.target.checked)} />
+                                  <span>{role}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </td>
+                          <td>
+                            <select value={a.physicalRole} onChange={(e) => setTodayRole(p.id, e.target.value as PhysicalRole)}>
+                              {physicalOptions.map((role) => <option key={role}>{role}</option>)}
+                            </select>
+                            {roles.includes("Coach") && (
+                              <label className="native-coach-today">
+                                <input type="checkbox" checked={a.coachToday} onChange={(e) => setCoachToday(p.id, e.target.checked)} />
+                                <span>Coach today</span>
+                              </label>
+                            )}
+                          </td>
+                          <td>
+                            <input aria-label={`${p.name} reserve priority`} disabled={squadRole !== "Reserve"} min="1" type="number" value={member?.priority ?? ""} onChange={(e) => setReservePriority(p.id, e.target.value)} placeholder="-" />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {!filteredRoster.length && (
+                      <tr><td className="native-no-results" colSpan={6}>No paddlers match “{rosterSearch}”.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {panel === "reserves" && activeSquad && (
+            <div className="native-panel native-reserve-panel">
+              <div className="native-panel-heading"><div><span>Reserve desk</span><h3>Resolve Core availability before building the boat</h3></div></div>
+              <div className="native-reserve-grid">
+                <section>
+                  <h4>Core issues</h4>
+                  {unresolvedCore.length
+                    ? unresolvedCore.map(([id]) => {
+                        const p = rosterMap.get(id);
+                        const a = assignmentFor(id);
+                        const attendance = attendanceFor(id);
+                        return <div className="native-reserve-row" key={id}><div><strong>{p?.name}</strong><small>{attendance !== "Confirmed" ? attendance : `${a.physicalRole} today, so a paddling spot opens`}</small></div></div>;
+                      })
+                    : <p>All Core paddlers are confirmed and assigned to paddling seats.</p>}
+                </section>
+                <section>
+                  <h4>Reserves</h4>
+                  {reserveMembers.length
+                    ? reserveMembers.map(([id, member]) => {
+                        const p = rosterMap.get(id);
+                        const attendance = attendanceFor(id);
+                        const a = assignmentFor(id);
+                        const active = Boolean(sessionState.activated[id]);
+                        return (
+                          <div className="native-reserve-row" key={id}>
+                            <div><strong>{p?.name}</strong><small>{member?.priority ? `Priority ${member.priority}` : "No fixed priority"} · {a.physicalRole} today</small></div>
+                            <span className={`native-attendance ${attendance.toLowerCase()}`}>{attendance}</span>
+                            <button disabled={attendance !== "Confirmed" || a.physicalRole !== "Paddler" || !activeSquad.coreFirst} type="button" onClick={() => toggleReserve(id)}>{active ? "Deactivate" : "Activate"}</button>
+                          </div>
+                        );
+                      })
+                    : <p>No Reserves assigned to this squad.</p>}
+                </section>
+              </div>
+              {activeSquad.coreFirst && <p className="native-panel-note">Open Core paddling spots remaining: <b>{stats.openCoreSpots}</b>. Confirmed Core paddlers are never displaced automatically by a Reserve.</p>}
+            </div>
+          )}
+        </section>
+      )}
+
+      {hydrated && <BoatPlannerCore key={plannerVersion} {...props} />}
     </div>
   );
 }
