@@ -5,6 +5,7 @@ import CoachToolsShell from "./coach-tools-shell";
 import "./globals.css";
 import "./coach-tools-shell.css";
 import "./no-logo.css";
+import "./boat-print-fix.css";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
