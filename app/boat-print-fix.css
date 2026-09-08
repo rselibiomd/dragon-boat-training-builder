@@ -1,0 +1,44 @@
+/* Boat Planner print compatibility after the native Squad wrapper was introduced. */
+@media print {
+  .app-shell > .boat-planner-native {
+    display: block !important;
+  }
+
+  .boat-planner-native {
+    background: #fff !important;
+    color: #102437 !important;
+    display: block !important;
+    height: auto !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+  }
+
+  .boat-planner-native > *:not(.boat-planner-shell) {
+    display: none !important;
+  }
+
+  .boat-planner-native > .boat-planner-shell {
+    display: block !important;
+    height: auto !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+  }
+
+  .boat-planner-native .boat-planner-shell > *:not(.boat-print-document) {
+    display: none !important;
+  }
+
+  .boat-planner-native .boat-print-document {
+    display: contents !important;
+  }
+
+  .boat-planner-native .print-boat-sheet {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    visibility: visible !important;
+  }
+}
