@@ -112,6 +112,30 @@ function writeStorage(key: string, value: unknown) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
+function baseRoleFor(paddler: StoredPaddler) {
+  const eligible = Array.isArray(paddler.eligibleRoles) ? paddler.eligibleRoles : [];
+  if (eligible.includes("Paddler")) return "Paddler";
+  if (eligible.includes("Steer")) return "Steer";
+  if (eligible.includes("Drummer")) return "Drummer";
+  return "Paddler";
+}
+
+function repairBaseRoster(records: StoredPaddler[]) {
+  return records.map((paddler) => paddler.sessionRole === "Unavailable"
+    ? { ...paddler, sessionRole: baseRoleFor(paddler) }
+    : paddler);
+}
+
+function repairBaseDraft(draft: StoredDraft | null) {
+  if (!draft) return null;
+  const paddlers = Array.isArray(draft.paddlers) ? repairBaseRoster(draft.paddlers) : draft.paddlers;
+  const repairedMap = new Map((paddlers || []).map((paddler) => [paddler.id, paddler]));
+  const spares = Array.isArray(draft.spares)
+    ? draft.spares.map((paddler) => repairedMap.get(paddler.id) || (paddler.sessionRole === "Unavailable" ? { ...paddler, sessionRole: baseRoleFor(paddler) } : paddler))
+    : draft.spares;
+  return { ...draft, paddlers, spares };
+}
+
 function clearSquadModeStorage() {
   window.localStorage.removeItem(SQUAD_MODE_ACTIVE_KEY);
   window.localStorage.removeItem(SQUAD_BACKUP_KEY);
@@ -123,11 +147,16 @@ function restoreRosterBackup() {
     clearSquadModeStorage();
     return null;
   }
-  writeStorage(ROSTER_KEY, backup.roster);
-  if (backup.draft) writeStorage(DRAFT_KEY, backup.draft);
+  const repaired: SquadPlannerBackup = {
+    ...backup,
+    roster: repairBaseRoster(backup.roster),
+    draft: repairBaseDraft(backup.draft),
+  };
+  writeStorage(ROSTER_KEY, repaired.roster);
+  if (repaired.draft) writeStorage(DRAFT_KEY, repaired.draft);
   else window.localStorage.removeItem(DRAFT_KEY);
   clearSquadModeStorage();
-  return backup;
+  return repaired;
 }
 
 function inferClubRoles(p: StoredPaddler): ClubRole[] {
@@ -202,8 +231,12 @@ export default function BoatPlanner(props: BoatPlannerProps) {
   const lineupStatus = lineupStatuses[sessionKey] ?? { status: "Draft" as LineupStatus, at: "" };
 
   function refreshRoster() {
-    const storedRoster = readStorage<StoredPaddler[]>(ROSTER_KEY, []);
-    const storedDraft = readStorage<StoredDraft | null>(DRAFT_KEY, null);
+    const storedRoster = squadMode
+      ? readStorage<StoredPaddler[]>(ROSTER_KEY, [])
+      : repairBaseRoster(readStorage<StoredPaddler[]>(ROSTER_KEY, []));
+    const storedDraft = squadMode
+      ? readStorage<StoredDraft | null>(DRAFT_KEY, null)
+      : repairBaseDraft(readStorage<StoredDraft | null>(DRAFT_KEY, null));
     const next = storedRoster.length ? storedRoster : Array.isArray(storedDraft?.paddlers) ? storedDraft.paddlers : [];
     setRoster(next);
     setClubRoles((current) => {
@@ -216,8 +249,10 @@ export default function BoatPlanner(props: BoatPlannerProps) {
   useEffect(() => {
     if (window.localStorage.getItem(SQUAD_MODE_ACTIVE_KEY) === "1") restoreRosterBackup();
 
-    const storedRoster = readStorage<StoredPaddler[]>(ROSTER_KEY, []);
-    const storedDraft = readStorage<StoredDraft | null>(DRAFT_KEY, null);
+    const storedRoster = repairBaseRoster(readStorage<StoredPaddler[]>(ROSTER_KEY, []));
+    const storedDraft = repairBaseDraft(readStorage<StoredDraft | null>(DRAFT_KEY, null));
+    writeStorage(ROSTER_KEY, storedRoster);
+    if (storedDraft) writeStorage(DRAFT_KEY, storedDraft);
     const nextRoster = storedRoster.length ? storedRoster : Array.isArray(storedDraft?.paddlers) ? storedDraft.paddlers : [];
     const nextSquads = normalizeSquads(readStorage<unknown>(SQUADS_KEY, []));
     const requested = window.localStorage.getItem(ACTIVE_SQUAD_KEY) || "";
@@ -252,7 +287,7 @@ export default function BoatPlanner(props: BoatPlannerProps) {
     const onFocus = () => refreshRoster();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, []);
+  }, [squadMode]);
 
   useEffect(() => {
     if (!squadMode || !buildFromSquadPending) return;
@@ -271,15 +306,20 @@ export default function BoatPlanner(props: BoatPlannerProps) {
   }, [buildFromSquadPending, plannerVersion, activeSquad?.name, squadMode]);
 
   function enableSquadMode() {
+    const currentRoster = repairBaseRoster(readStorage<StoredPaddler[]>(ROSTER_KEY, []));
+    const currentDraft = repairBaseDraft(readStorage<StoredDraft | null>(DRAFT_KEY, null));
+    writeStorage(ROSTER_KEY, currentRoster);
+    if (currentDraft) writeStorage(DRAFT_KEY, currentDraft);
     const backup: SquadPlannerBackup = {
-      roster: readStorage<StoredPaddler[]>(ROSTER_KEY, []),
-      draft: readStorage<StoredDraft | null>(DRAFT_KEY, null),
+      roster: currentRoster,
+      draft: currentDraft,
       savedAt: new Date().toISOString(),
     };
     writeStorage(SQUAD_BACKUP_KEY, backup);
     window.localStorage.setItem(SQUAD_MODE_ACTIVE_KEY, "1");
+    setRoster(currentRoster);
     setSquadMode(true);
-    setMessage("Squad Mode is on. Squad settings will control the next Squad build until you return to Roster & Attendance.");
+    setMessage("Squad Mode is on. Squad settings control only the Squad build. Your normal roster attendance and roles are preserved separately.");
   }
 
   function disableSquadMode() {
@@ -291,7 +331,13 @@ export default function BoatPlanner(props: BoatPlannerProps) {
     setMessage("");
     clearRosterSearch();
     if (backup) setRoster(backup.roster);
-    else refreshRoster();
+    else {
+      const repairedRoster = repairBaseRoster(readStorage<StoredPaddler[]>(ROSTER_KEY, []));
+      const repairedDraft = repairBaseDraft(readStorage<StoredDraft | null>(DRAFT_KEY, null));
+      writeStorage(ROSTER_KEY, repairedRoster);
+      if (repairedDraft) writeStorage(DRAFT_KEY, repairedDraft);
+      setRoster(repairedRoster);
+    }
     setPlannerVersion((value) => value + 1);
   }
 
@@ -472,7 +518,7 @@ export default function BoatPlanner(props: BoatPlannerProps) {
       const a = assignmentFor(p.id);
       const inWorkingSquad = Boolean(member && !["Inactive", "Waitlist"].includes(member.role));
       let participating = false;
-      let sessionRole = "Unavailable";
+      let sessionRole = p.sessionRole === "Unavailable" ? baseRoleFor(p) : (p.sessionRole || baseRoleFor(p));
 
       if (attendance === "Confirmed" && inWorkingSquad) {
         if (a.physicalRole === "Steer" && roles.includes("Steer")) {
@@ -620,8 +666,8 @@ export default function BoatPlanner(props: BoatPlannerProps) {
           <span>Boat source</span>
           <strong>{squadMode ? "Squad Mode" : "Roster & Attendance"}</strong>
           <small>{squadMode
-            ? "The selected Squad controls who is available for a Squad build. Your normal roster is preserved until you leave Squad Mode."
-            : "Default mode. The regular Roster & Attendance settings below control who is available to build the boat."}</small>
+            ? "The selected Squad controls only the Squad build. Your normal roster attendance and roles are preserved until you leave Squad Mode."
+            : "Default mode. The regular Roster & Attendance settings below are the source of truth for who is available to build the boat."}</small>
         </div>
         <button type="button" onClick={squadMode ? disableSquadMode : enableSquadMode}>
           {squadMode ? "Return to Roster & Attendance" : "Use Squad Mode"}
