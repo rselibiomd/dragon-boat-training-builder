@@ -7,12 +7,12 @@
   .boat-print-document .print-boat-sheet {
     background: #fff !important;
     color: #102437 !important;
-    width: 10.35in !important;
-    max-width: 10.35in !important;
-    min-height: 7.75in !important;
-    height: 7.75in !important;
+    width: 10.28in !important;
+    max-width: 10.28in !important;
+    min-height: 7.72in !important;
+    height: 7.72in !important;
     margin: 0 auto !important;
-    padding: 0.08in 0.14in 0.1in !important;
+    padding: 0.08in 0.12in 0.08in !important;
     overflow: hidden !important;
   }
 
@@ -22,60 +22,65 @@
 
   .boat-print-document .boat-print-title {
     align-items: center !important;
-    border-bottom: 2px solid #0a2740;
+    border-bottom: 2px solid #0a2740 !important;
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.22in;
-    min-height: 0.62in;
-    padding: 0.05in 0.04in 0.09in !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 0.2in !important;
+    min-height: 0.54in !important;
+    padding: 0.03in 0.03in 0.07in !important;
   }
 
   .boat-print-document .boat-print-title h1 {
     color: #071d31 !important;
-    font-size: 19pt !important;
-    line-height: 1.02 !important;
-    margin: 0.03in 0 0 !important;
-    overflow-wrap: anywhere;
+    font-size: 17pt !important;
+    line-height: 1.05 !important;
+    margin: 0.02in 0 0 !important;
+    overflow-wrap: anywhere !important;
   }
 
   .boat-print-document .boat-print-title p {
     color: #d7353e !important;
-    font-size: 7.5pt !important;
+    font-size: 7pt !important;
     line-height: 1 !important;
     margin: 0 !important;
   }
 
   .boat-print-document .boat-print-title > div:last-child {
-    border-left: 1px solid #cfd9e0;
-    min-width: 1.35in;
-    padding-left: 0.14in;
+    border-left: 1px solid #cfd9e0 !important;
+    min-width: 1.28in !important;
+    padding-left: 0.13in !important;
   }
 
   .boat-print-document .boat-print-title > div:last-child span {
     color: #687b8d !important;
-    font-size: 6.5pt !important;
+    font-size: 6pt !important;
   }
 
   .boat-print-document .boat-print-title > div:last-child strong {
     color: #0a2740 !important;
-    font-size: 9.5pt !important;
-    margin-top: 0.03in !important;
+    font-size: 9pt !important;
+    margin-top: 0.02in !important;
+  }
+
+  /* The crew-facing sheet is intentionally minimal. */
+  .boat-print-crew .boat-print-note {
+    display: none !important;
   }
 
   .boat-print-document .boat-print-note {
-    align-items: center;
+    align-items: center !important;
     background: #f6f8fa !important;
     border: 1px solid #d6e0e7 !important;
     display: flex !important;
-    gap: 0.08in;
-    margin: 0.06in 0 0 !important;
-    min-height: 0.32in;
-    padding: 0.05in 0.09in !important;
+    gap: 0.08in !important;
+    margin: 0.05in 0 0 !important;
+    min-height: 0.3in !important;
+    padding: 0.04in 0.08in !important;
   }
 
   .boat-print-document .boat-print-note b,
   .boat-print-document .boat-print-note span {
-    font-size: 7pt !important;
+    font-size: 6.5pt !important;
     line-height: 1.15 !important;
   }
 
@@ -83,75 +88,106 @@
     background: #f2f6f8 !important;
     border: 1px solid #cbd7df !important;
     display: grid !important;
-    gap: 0.12in;
-    grid-template-columns: 1fr 1fr;
-    margin-top: 0.07in !important;
-    min-height: 0.42in;
-    padding: 0.06in 0.12in !important;
+    gap: 0.14in !important;
+    grid-template-columns: 1fr 1fr !important;
+    margin-top: 0.06in !important;
+    min-height: 0.38in !important;
+    padding: 0.05in 0.11in !important;
   }
 
   .boat-print-document .boat-officials span {
     color: #243f53 !important;
     font-size: 9pt !important;
-    line-height: 1.1 !important;
+    line-height: 1.08 !important;
   }
 
   .boat-print-document .boat-officials b {
     color: #667b8c !important;
-    font-size: 5.5pt !important;
-    margin-bottom: 0.02in;
+    font-size: 5.3pt !important;
+    margin-bottom: 0.015in !important;
   }
 
+  /* Seating board: clarity over decoration. */
   .boat-print-document .dragon-boat-diagram {
     align-items: stretch !important;
     display: grid !important;
-    grid-template-rows: 0.24in minmax(0, 1fr) 0.2in !important;
+    grid-template-rows: 0.3in minmax(0, 1fr) 0.16in !important;
     height: auto !important;
-    margin: 0.08in auto 0 !important;
+    margin: 0.07in auto 0 !important;
     max-width: none !important;
-    width: 9.75in !important;
+    width: 9.82in !important;
   }
 
   .boat-print-document .dragon-prow,
   .boat-print-document .dragon-stern {
-    align-items: center !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    clip-path: none !important;
     color: #566d7e !important;
+    height: auto !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    position: relative !important;
+    width: 100% !important;
+    z-index: auto !important;
+  }
+
+  .boat-print-document .dragon-prow {
+    align-items: center !important;
+    align-self: stretch !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 0.5in minmax(0, 1fr) !important;
+    justify-self: stretch !important;
+  }
+
+  .boat-print-document .dragon-prow > span {
+    display: none !important;
+  }
+
+  .boat-print-document .dragon-prow > b {
+    color: #7a8d9b !important;
+    font-size: 5.5pt !important;
+    grid-column: 2 !important;
+    letter-spacing: 0.12em !important;
+    margin: 0 !important;
+    text-align: center !important;
+    text-transform: uppercase !important;
+  }
+
+  .boat-print-document .dragon-stern {
+    align-items: center !important;
     display: flex !important;
     flex-direction: row !important;
-    gap: 0.06in;
+    gap: 0.06in !important;
     justify-content: center !important;
-    min-height: 0 !important;
-  }
-
-  .boat-print-document .dragon-prow span {
-    color: #0a2740 !important;
-    font-size: 8pt !important;
-    line-height: 1 !important;
-  }
-
-  .boat-print-document .dragon-prow b,
-  .boat-print-document .dragon-stern b {
-    font-size: 6.5pt !important;
-    letter-spacing: 0.08em;
-    margin: 0 !important;
-    text-transform: uppercase;
   }
 
   .boat-print-document .dragon-stern span {
-    background: #0a2740 !important;
+    background: #95a7b4 !important;
+    border-radius: 0 !important;
     height: 1px !important;
-    width: 0.6in !important;
+    margin: 0 !important;
+    width: 0.46in !important;
+  }
+
+  .boat-print-document .dragon-stern b {
+    color: #7a8d9b !important;
+    font-size: 5.5pt !important;
+    letter-spacing: 0.12em !important;
+    margin: 0 !important;
+    text-transform: uppercase !important;
   }
 
   .boat-print-document .dragon-hull {
     background: #fff !important;
-    border: 2.5px solid #0a2740 !important;
-    border-radius: 0.34in !important;
+    border: 1.5px solid #9fb0bc !important;
+    border-radius: 0.12in !important;
     box-shadow: none !important;
     display: grid !important;
-    grid-template-rows: repeat(10, minmax(0, 1fr));
-    height: 5.45in !important;
-    overflow: hidden !important;
+    gap: 0 !important;
+    grid-template-rows: repeat(10, minmax(0, 1fr)) !important;
+    overflow: visible !important;
     padding: 0 !important;
     position: relative !important;
     width: 100% !important;
@@ -165,11 +201,12 @@
     align-items: stretch !important;
     background: #fff !important;
     border: 0 !important;
-    border-bottom: 1px solid #d5e0e7 !important;
+    border-bottom: 1px solid #d6e0e7 !important;
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) 0.58in minmax(0, 1fr) !important;
+    gap: 0 !important;
+    grid-template-columns: minmax(0, 1fr) 0.48in minmax(0, 1fr) !important;
     min-height: 0 !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     padding: 0 !important;
   }
 
@@ -179,34 +216,39 @@
 
   .boat-print-document .print-seat {
     align-items: center !important;
-    background: transparent !important;
+    background: #fff !important;
     border: 0 !important;
+    border-radius: 0 !important;
     display: flex !important;
-    flex-direction: column;
+    flex-direction: column !important;
     justify-content: center !important;
-    min-width: 0;
-    overflow: hidden !important;
-    padding: 0.025in 0.16in !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+    padding: 0.035in 0.18in !important;
     text-align: center !important;
   }
 
   .boat-print-document .print-seat-left {
-    border-right: 1px solid #e4ebf0 !important;
+    border-right: 1px solid #e7edf1 !important;
   }
 
   .boat-print-document .print-seat-right {
-    border-left: 1px solid #e4ebf0 !important;
+    border-left: 1px solid #e7edf1 !important;
   }
 
   .boat-print-document .print-seat strong {
     color: #0a2740 !important;
     display: block !important;
     font-weight: 800 !important;
-    letter-spacing: -0.01em;
-    max-width: 100%;
-    overflow-wrap: anywhere;
+    letter-spacing: -0.005em !important;
+    max-height: none !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere !important;
+    text-overflow: clip !important;
     text-align: center !important;
     white-space: normal !important;
+    width: 100% !important;
   }
 
   .boat-print-document .print-row-number {
@@ -216,7 +258,7 @@
     border: 0 !important;
     color: #fff !important;
     display: flex !important;
-    flex-direction: column;
+    flex-direction: column !important;
     justify-content: center !important;
     margin: 0 !important;
     min-width: 0 !important;
@@ -231,11 +273,7 @@
   }
 
   .boat-print-document .print-row-number small {
-    color: #c6d3dc !important;
-    font-size: 4.8pt !important;
-    line-height: 1 !important;
-    margin-top: 0.02in;
-    text-transform: uppercase;
+    display: none !important;
   }
 
   .boat-print-document .print-page-footer {
@@ -243,89 +281,90 @@
     border-top: 1px solid #d9e1e7 !important;
     color: #6b7e8d !important;
     display: flex !important;
-    font-size: 6pt !important;
+    font-size: 5.7pt !important;
     justify-content: space-between !important;
-    margin-top: 0.06in !important;
-    padding-top: 0.04in !important;
+    margin-top: 0.05in !important;
+    min-height: 0.14in !important;
+    padding-top: 0.03in !important;
     position: static !important;
   }
 
-  /* Team-facing export: names are the priority. */
   .boat-print-crew .dragon-hull {
-    height: 5.72in !important;
+    height: 5.86in !important;
   }
 
   .boat-print-crew .print-seat strong {
-    font-size: 13pt !important;
-    line-height: 1.04 !important;
+    font-size: 11.5pt !important;
+    line-height: 1.2 !important;
   }
 
   .boat-print-crew .print-seat {
-    padding-left: 0.18in !important;
-    padding-right: 0.18in !important;
+    padding-left: 0.22in !important;
+    padding-right: 0.22in !important;
   }
 
   .boat-print-crew .boat-officials span {
     font-size: 9.5pt !important;
   }
 
-  /* Coach export: same readable boat, with compact supporting detail. */
+  /* Coach export keeps the same clear board, with compact supporting detail. */
   .boat-print-coach .dragon-hull {
-    height: 4.28in !important;
+    height: 4.45in !important;
   }
 
   .boat-print-coach .print-seat strong {
-    font-size: 10.5pt !important;
-    line-height: 1.03 !important;
+    font-size: 9.8pt !important;
+    line-height: 1.12 !important;
   }
 
   .boat-print-coach .print-seat small {
     color: #5d7181 !important;
     display: block !important;
-    font-size: 5.3pt !important;
-    line-height: 1.08 !important;
-    margin-top: 0.02in !important;
-    max-width: 100%;
-    overflow-wrap: anywhere;
+    font-size: 5.2pt !important;
+    line-height: 1.12 !important;
+    margin-top: 0.015in !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere !important;
     text-align: center !important;
     white-space: normal !important;
   }
 
   .boat-print-coach .coach-print-summary {
     gap: 0.04in !important;
-    margin-top: 0.06in !important;
-  }
-
-  .boat-print-coach .coach-print-summary > div {
-    min-height: 0.37in !important;
-    padding: 0.04in 0.06in !important;
-  }
-
-  .boat-print-coach .coach-print-summary span {
-    font-size: 5pt !important;
-  }
-
-  .boat-print-coach .coach-print-summary strong {
-    font-size: 7.5pt !important;
-  }
-
-  .boat-print-coach .boat-print-footer-grid {
-    gap: 0.06in !important;
     margin-top: 0.05in !important;
   }
 
+  .boat-print-coach .coach-print-summary > div {
+    min-height: 0.35in !important;
+    padding: 0.035in 0.055in !important;
+  }
+
+  .boat-print-coach .coach-print-summary span {
+    font-size: 4.8pt !important;
+  }
+
+  .boat-print-coach .coach-print-summary strong {
+    font-size: 7.2pt !important;
+  }
+
+  .boat-print-coach .boat-print-footer-grid {
+    gap: 0.05in !important;
+    margin-top: 0.045in !important;
+  }
+
   .boat-print-coach .boat-print-footer-grid section {
-    min-height: 0.4in !important;
-    padding: 0.05in 0.07in !important;
+    min-height: 0.38in !important;
+    padding: 0.045in 0.06in !important;
   }
 
   .boat-print-coach .boat-print-footer-grid b {
-    font-size: 5.3pt !important;
+    font-size: 5.1pt !important;
   }
 
   .boat-print-coach .boat-print-footer-grid p {
-    font-size: 5.7pt !important;
+    font-size: 5.5pt !important;
     line-height: 1.12 !important;
-    margin: 0.02in 0 0 !important;
+    margin: 0.015in 0 0 !important;
   }
 }
