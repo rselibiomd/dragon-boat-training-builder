@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kdbc-coach-tools-v9-native-squad-planner';
+const CACHE_NAME = 'kdbc-coach-tools-v10-roster-persistence';
 const APP_ROOT = '/dragon-boat-training-builder/';
 const CORE = [
   APP_ROOT,
@@ -41,6 +41,7 @@ self.addEventListener('fetch', event => {
   const alwaysFresh =
     url.pathname.endsWith('/manifest.webmanifest') ||
     url.pathname.endsWith('/app-icon.svg') ||
+    url.pathname.endsWith('/roster-persistence-guard.js') ||
     url.pathname.includes('/_next/static/css/') ||
     url.pathname.includes('/_next/static/chunks/');
 
