@@ -1,0 +1,22 @@
+@media print {
+  .boat-print-document .dragon-prow::before,
+  .boat-print-document .dragon-prow::after {
+    color: #566d7e;
+    font-size: 6pt;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .boat-print-document .dragon-prow::before {
+    content: "Left";
+    margin-right: auto;
+    padding-left: 0.34in;
+  }
+
+  .boat-print-document .dragon-prow::after {
+    content: "Right";
+    margin-left: auto;
+    padding-right: 0.34in;
+  }
+}
