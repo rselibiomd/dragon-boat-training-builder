@@ -50,6 +50,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <Script src={`${basePath}/roster-persistence-guard.js`} strategy="beforeInteractive" />
         <Script src={`${basePath}/stroke-review-bridge.js`} strategy="beforeInteractive" />
         {children}
         <CoachToolsShell />
