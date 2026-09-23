@@ -8,6 +8,7 @@ import "./no-logo.css";
 import "./boat-print-fix.css";
 import "./boat-print-readable.css";
 import "./boat-print-labels.css";
+import "./boat-coach-prep.css";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 

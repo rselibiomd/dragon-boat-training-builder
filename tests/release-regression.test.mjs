@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
-const boats = await readFile(new URL("../app/boat-planner.tsx", import.meta.url), "utf8");
+const boats = await readFile(new URL("../app/boat-planner-core.tsx", import.meta.url), "utf8");
+const boatWrapper = await readFile(new URL("../app/boat-planner.tsx", import.meta.url), "utf8");
 
 test("Release 1 trust controls remain present", () => {
   assert.match(page, /blocks: session/);

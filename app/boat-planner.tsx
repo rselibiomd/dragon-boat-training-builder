@@ -292,7 +292,7 @@ export default function BoatPlanner(props: BoatPlannerProps) {
   useEffect(() => {
     if (!squadMode || !buildFromSquadPending) return;
     const timer = window.setTimeout(() => {
-      const buildButton = document.querySelector<HTMLButtonElement>(".planner-build-row > button");
+      const buildButton = document.querySelector<HTMLButtonElement>("[data-build-boat-button]");
       if (!buildButton || buildButton.disabled) {
         setMessage("The squad was loaded, but there are no eligible paddlers ready to build. Check attendance, Core/Reserve status, and Today assignments.");
         setBuildFromSquadPending(false);
