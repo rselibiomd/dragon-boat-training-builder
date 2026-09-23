@@ -66,12 +66,16 @@ type SavedLineup = {
   id: string;
   name: string;
   savedAt: string;
+  savedAtIso?: string;
   strategy: Strategy;
   compositionRule: CompositionRule;
   snapshot?: LineupSnapshot;
   boats: Boat[];
   paddlers?: Paddler[];
+  spares?: Paddler[];
   sessionId?: string;
+  sessionTitle?: string;
+  sessionDate?: string;
 };
 
 type LineupSnapshot = {
@@ -733,6 +737,7 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
   const [substitutionOutId, setSubstitutionOutId] = useState("");
   const [substitutionInId, setSubstitutionInId] = useState("");
   const [changedPaddlerIds, setChangedPaddlerIds] = useState<string[]>([]);
+  const [lastSavedAt, setLastSavedAt] = useState("");
   const touchDragRef = useRef<TouchDrag | null>(null);
   const lastDialogTrigger = useRef<HTMLElement | null>(null);
   const dialogWasOpen = useRef(false);
@@ -743,20 +748,49 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
         const storedRoster = JSON.parse(window.localStorage.getItem(ROSTER_KEY) ?? "[]");
         const storedLineups = JSON.parse(window.localStorage.getItem(LINEUPS_KEY) ?? "[]");
         const storedDraft = JSON.parse(window.localStorage.getItem(DRAFT_KEY) ?? "null") as BoatDraft | null;
-        setSavedLineups(Array.isArray(storedLineups) ? storedLineups.map((saved: SavedLineup) => ({ ...saved, boats: normalizeBoats(saved.boats), paddlers: saved.paddlers ? normalizeRoster(saved.paddlers as unknown as Record<string, unknown>[]) : undefined })) : []);
-        if (storedDraft?.version === 1 && Array.isArray(storedDraft.paddlers)) {
-          const restoredRoster = normalizeRoster(storedDraft.paddlers);
-          setPaddlers(restoredRoster);
+        setSavedLineups(Array.isArray(storedLineups) ? storedLineups.map((saved: SavedLineup) => ({
+          ...saved,
+          boats: normalizeBoats(saved.boats),
+          paddlers: saved.paddlers ? normalizeRoster(saved.paddlers as unknown as Record<string, unknown>[]) : undefined,
+          spares: saved.spares ? normalizeRoster(saved.spares as unknown as Record<string, unknown>[]) : undefined,
+        })) : []);
+
+        // The club roster is the permanent source of truth. Draft paddlers are
+        // only a migration fallback for older browser data that has no roster.
+        const masterRoster = Array.isArray(storedRoster) ? normalizeRoster(storedRoster) : [];
+        const legacyDraftRoster = storedDraft?.version === 1 && Array.isArray(storedDraft.paddlers)
+          ? normalizeRoster(storedDraft.paddlers)
+          : [];
+        const restoredRoster = masterRoster.length ? masterRoster : legacyDraftRoster;
+        setPaddlers(restoredRoster);
+        if (!masterRoster.length && legacyDraftRoster.length) {
+          window.localStorage.setItem(ROSTER_KEY, JSON.stringify(legacyDraftRoster));
+        }
+
+        if (storedDraft?.version === 1) {
+          const rosterIds = new Set(restoredRoster.map((paddler) => paddler.id));
+          const restoredBoats = normalizeBoats(storedDraft.boats).map((boat) => ({
+            ...boat,
+            seats: boat.seats.map((seat) => ({
+              ...seat,
+              leftId: seat.leftId && rosterIds.has(seat.leftId) ? seat.leftId : null,
+              rightId: seat.rightId && rosterIds.has(seat.rightId) ? seat.rightId : null,
+              leftLocked: Boolean(seat.leftId && rosterIds.has(seat.leftId) && seat.leftLocked),
+              rightLocked: Boolean(seat.rightId && rosterIds.has(seat.rightId) && seat.rightLocked),
+            })),
+            steerId: boat.steerId && rosterIds.has(boat.steerId) ? boat.steerId : null,
+            drummerId: boat.drummerId && rosterIds.has(boat.drummerId) ? boat.drummerId : null,
+          }));
+          const assigned = new Set(restoredBoats.flatMap((boat) => boat.seats.flatMap((seat) => [seat.leftId, seat.rightId])).filter(Boolean) as string[]);
           setBoatCount(storedDraft.boatCount || 1);
           setStrategy(storedDraft.strategy || "balanced");
           setCompositionRule(storedDraft.compositionRule || "count");
-          setBoats(normalizeBoats(storedDraft.boats));
-          setSpares(Array.isArray(storedDraft.spares) ? storedDraft.spares : []);
+          setBoats(restoredBoats);
+          setSpares(restoredRoster.filter((paddler) => paddler.participating && paddler.sessionRole === "Paddler" && !assigned.has(paddler.id)));
           setLineupName(storedDraft.lineupName || "Practice lineup");
           setLineupSnapshot(storedDraft.lineupSnapshot ?? null);
           setRebuildNeeded(Boolean(storedDraft.rebuildNeeded));
-        } else {
-          setPaddlers(Array.isArray(storedRoster) ? normalizeRoster(storedRoster) : []);
+          setLastSavedAt(storedDraft.savedAt || "");
         }
       } catch {
         setPaddlers([]);
@@ -802,6 +836,7 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
 
   useEffect(() => {
     if (!hydrated) return;
+    const savedAt = new Date().toISOString();
     const draft: BoatDraft = {
       version: 1,
       paddlers,
@@ -813,9 +848,10 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
       lineupName,
       lineupSnapshot,
       rebuildNeeded,
-      savedAt: new Date().toISOString(),
+      savedAt,
     };
     window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    setLastSavedAt(savedAt);
     if (sessionId) updateSession(window.localStorage, sessionId, {
       title: sessionTitle,
       date: sessionDate,
@@ -1199,15 +1235,21 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
 
   function saveLineup() {
     if (!boats.length) return;
+    const savedAtIso = new Date().toISOString();
     const saved: SavedLineup = {
       id: String(Date.now()),
       name: lineupName.trim() || "Boat lineup",
-      savedAt: new Date().toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" }),
+      savedAt: new Date(savedAtIso).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" }),
+      savedAtIso,
       strategy: lineupSnapshot?.strategy ?? strategy,
       compositionRule: lineupSnapshot?.compositionRule ?? compositionRule,
-      snapshot: lineupSnapshot ?? { boatCount, strategy, compositionRule, generatedAt: new Date().toISOString() },
+      snapshot: lineupSnapshot ?? { boatCount, strategy, compositionRule, generatedAt: savedAtIso },
       boats: structuredClone(boats),
+      paddlers: structuredClone(paddlers),
+      spares: structuredClone(spares),
       sessionId,
+      sessionTitle,
+      sessionDate,
     };
     const next = [saved, ...savedLineups].slice(0, 20);
     setSavedLineups(next);
@@ -1215,7 +1257,7 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
     showNotice("Lineup saved on this device");
   }
 
-  function loadLineup(saved: SavedLineup) {
+  function loadLineup(saved: SavedLineup, options: { startingPoint?: boolean } = {}) {
     const restored = derivedLineup(normalizeBoats(saved.boats), paddlers, saved.compositionRule);
     setBoats(restored.boats);
     setBoatCount(saved.snapshot?.boatCount ?? saved.boats.length);
@@ -1226,10 +1268,26 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
     setRebuildNeeded(false);
     setUndoStack([]);
     setRedoStack([]);
-    const assigned = new Set(saved.boats.flatMap((boat) => boat.seats.flatMap((seat) => [seat.leftId, seat.rightId])).filter(Boolean));
-    setSpares(paddlers.filter((paddler) => paddler.participating && paddler.sessionRole === "Paddler" && !assigned.has(paddler.id)));
+    setSpares(restored.spares);
     setSavedOpen(false);
-    showNotice("Saved lineup loaded using current paddler profiles");
+
+    const savedIds = new Set((saved.paddlers || []).map((paddler) => paddler.id));
+    const currentIds = new Set(paddlers.map((paddler) => paddler.id));
+    const missingSnapshotProfiles = [...savedIds].filter((id) => !currentIds.has(id)).length;
+    if (options.startingPoint) {
+      showNotice(`Started from ${saved.name}. Current attendance was applied and unavailable seats were left open.`);
+    } else if (missingSnapshotProfiles) {
+      showNotice(`Saved lineup loaded. ${missingSnapshotProfiles} archived paddler profile${missingSnapshotProfiles === 1 ? "" : "s"} remain in the saved snapshot but are no longer on the current roster.`);
+    } else {
+      showNotice("Saved lineup loaded using current paddler profiles");
+    }
+  }
+
+  function startFromLastLineup() {
+    const saved = savedLineups[0];
+    if (!saved) return;
+    loadLineup(saved, { startingPoint: true });
+    window.setTimeout(() => document.getElementById("boat-lineups")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
   }
 
   function duplicateLineup(saved: SavedLineup) {
@@ -1314,6 +1372,16 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
   const steerCandidates = paddlers.filter((paddler) => paddler.participating && paddler.sessionRole === "Steer");
   const drummerCandidates = paddlers.filter((paddler) => paddler.participating && paddler.sessionRole === "Drummer");
   const seatedForSubstitution = assignedPaddlers.map((id) => paddlerMap.get(id)).filter(Boolean) as Paddler[];
+  const lastSavedLineup = savedLineups[0] ?? null;
+  const coachAttention: Array<{ tone: "blocker" | "review"; label: string }> = [];
+  if (!participating.length) coachAttention.push({ tone: "blocker", label: "No paddlers are marked attending." });
+  if (steerCandidates.length < boatCount) coachAttention.push({ tone: "blocker", label: `${boatCount - steerCandidates.length} steer${boatCount - steerCandidates.length === 1 ? "" : "s"} still needed for ${boatCount} boat${boatCount === 1 ? "" : "s"}.` });
+  if (drummerCandidates.length < boatCount) coachAttention.push({ tone: "review", label: `${boatCount - drummerCandidates.length} drummer${boatCount - drummerCandidates.length === 1 ? "" : "s"} not assigned for ${boatCount} boat${boatCount === 1 ? "" : "s"}.` });
+  if (rebuildNeeded) coachAttention.push({ tone: "review", label: "Attendance or setup changed after the current seating was built." });
+  const coachReady = participating.length > 0 && steerCandidates.length >= boatCount;
+  const autosaveLabel = lastSavedAt
+    ? `Saved ${new Date(lastSavedAt).toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit" })}`
+    : "Autosave ready";
 
   return (
     <section className={`boat-planner-shell boat-display-${boatDisplay}`}>
@@ -1388,10 +1456,28 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
 
       {error && <div className="planner-error" role="alert"><span>!</span>{error}<button aria-label="Dismiss error" onClick={() => setError("")} type="button">×</button></div>}
 
-      <div className="planner-build-row">
-        <div><strong>{participating.length} ready to place</strong><span>{plannedSeats} seats · {potentialSpares} potential spare{potentialSpares === 1 ? "" : "s"}</span></div>
-        <button disabled={!paddlers.length} onClick={generate} type="button">Build {boatCount === 1 ? "boat" : `${boatCount} boats`} →</button>
-      </div>
+      <section className="coach-prep-card" aria-label="Coach prep">
+        <div className="coach-prep-heading">
+          <div><p className="eyebrow">Coach prep</p><h2>{coachAttention.length ? "Check before launch" : "Ready to build"}</h2><p>Who is here, what needs attention, then build. Keep the setup decisions above only when you need them.</p></div>
+          <span className="coach-autosave">✓ {autosaveLabel}</span>
+        </div>
+        <div className="coach-prep-stats">
+          <div><strong>{participating.length}</strong><span>Paddlers ready</span></div>
+          <div><strong>{plannedSeats}</strong><span>Planned seats</span></div>
+          <div><strong>{potentialSpares}</strong><span>Potential spares</span></div>
+          <div><strong>{steerCandidates.length}/{boatCount}</strong><span>Steers</span></div>
+          <div><strong>{drummerCandidates.length}/{boatCount}</strong><span>Drummers</span></div>
+        </div>
+        <div className={`coach-attention ${coachAttention.length ? "has-items" : "is-ready"}`}>
+          {coachAttention.length ? coachAttention.map((item, index) => <button className={item.tone} key={`${item.label}-${index}`} onClick={() => setRosterOpen(true)} type="button"><span>{item.tone === "blocker" ? "!" : "•"}</span>{item.label}</button>) : <p><span>✓</span> Attendance and steering coverage are ready. Review the generated boat before using it.</p>}
+        </div>
+        <div className="coach-prep-actions">
+          <button onClick={() => setRosterOpen(true)} type="button">Manage attendance</button>
+          <button disabled={!lastSavedLineup} onClick={startFromLastLineup} type="button">{lastSavedLineup ? `Start from last lineup · ${lastSavedLineup.name}` : "No saved lineup yet"}</button>
+          <button className="primary" data-build-boat-button disabled={!paddlers.length} onClick={generate} type="button">Build {boatCount === 1 ? "boat" : `${boatCount} boats`} →</button>
+        </div>
+        {!coachReady && participating.length > 0 && <small className="coach-prep-note">You can still build for planning. Resolve the highlighted operating items before launching.</small>}
+      </section>
 
       {boats.length > 0 && (
         <section className="lineup-section" id="boat-lineups">
@@ -1578,7 +1664,7 @@ export default function BoatPlanner({ theme, onThemeChange, sessionTitle, sessio
             {savedLineups.length ? (
               <div className="saved-list saved-list-manage">{savedLineups.map((saved) => (
                 <article key={saved.id}>
-                  <button onClick={() => loadLineup(saved)} type="button"><span><strong>{saved.name}</strong><small>{saved.boats.length} boat{saved.boats.length === 1 ? "" : "s"} · {saved.savedAt}</small></span><b>Load →</b></button>
+                  <button onClick={() => loadLineup(saved)} type="button"><span><strong>{saved.name}</strong><small>{saved.boats.length} boat{saved.boats.length === 1 ? "" : "s"} · {saved.savedAt}{saved.paddlers?.length ? ` · ${saved.paddlers.length} paddler snapshot` : ""}</small></span><b>Load →</b></button>
                   <div><button onClick={() => renameLineup(saved)} type="button">Rename</button><button onClick={() => duplicateLineup(saved)} type="button">Duplicate</button><button onClick={() => deleteLineup(saved.id)} type="button">Delete</button></div>
                 </article>
               ))}</div>
