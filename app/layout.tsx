@@ -37,9 +37,12 @@ export const metadata: Metadata = {
     "theme-color": "#071827",
   },
   icons: {
-    icon: `${basePath}/app-icon.svg`,
-    shortcut: `${basePath}/app-icon.svg`,
-    apple: `${basePath}/app-icon.svg`,
+    icon: [
+      { url: `${basePath}/icons/favicon-32.png`, sizes: "32x32", type: "image/png" },
+      { url: `${basePath}/icons/kdbc-192.png`, sizes: "192x192", type: "image/png" },
+    ],
+    shortcut: `${basePath}/icons/favicon-32.png`,
+    apple: { url: `${basePath}/icons/apple-touch-icon.png`, sizes: "180x180", type: "image/png" },
   },
 };
 

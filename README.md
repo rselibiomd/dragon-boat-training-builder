@@ -66,3 +66,9 @@ npm test
 ```
 
 The behavioural regression suite covers session migration, current-roster lineup loading, constraint handling, missing-rating confidence, substitution stability, backup validation, and rendered output markers.
+
+## Installed app icons
+
+The Home Screen and browser icons use the existing official `public/kdbc-logo.jpeg` artwork. Run `npm run icons` to regenerate the committed PNGs and legacy SVG icon aliases. The artwork is trimmed, resized proportionally and centered on white; the maskable version fits inside a centered 56% square, entirely within the 80% diameter safe circle. Coach Tools' in-app logo suppression stays unchanged.
+
+The manifest and icon metadata include the GitHub Pages repository prefix. Icon changes must also update the service-worker cache version. Existing Home Screen installations may need to be removed and added again to refresh the icon.

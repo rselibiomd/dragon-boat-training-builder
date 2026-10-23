@@ -1,9 +1,10 @@
-const CACHE_NAME = 'kdbc-coach-tools-v10-roster-persistence';
+const CACHE_NAME = 'kdbc-coach-tools-v11-kdbc-app-icons';
 const APP_ROOT = '/dragon-boat-training-builder/';
 const CORE = [
   APP_ROOT,
   `${APP_ROOT}manifest.webmanifest`,
-  `${APP_ROOT}app-icon.svg`
+  `${APP_ROOT}app-icon.svg`,
+  ...["apple-touch-icon.png", "kdbc-192.png", "kdbc-512.png", "kdbc-maskable-512.png", "favicon-32.png"].map(name => `${APP_ROOT}icons/${name}`)
 ];
 
 self.addEventListener('install', event => {
@@ -41,6 +42,8 @@ self.addEventListener('fetch', event => {
   const alwaysFresh =
     url.pathname.endsWith('/manifest.webmanifest') ||
     url.pathname.endsWith('/app-icon.svg') ||
+    url.pathname.endsWith('/favicon.svg') ||
+    url.pathname.startsWith(`${APP_ROOT}icons/`) ||
     url.pathname.endsWith('/roster-persistence-guard.js') ||
     url.pathname.includes('/_next/static/css/') ||
     url.pathname.includes('/_next/static/chunks/');
